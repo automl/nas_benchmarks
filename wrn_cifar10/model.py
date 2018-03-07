@@ -42,14 +42,12 @@ class ResNet(object):
 
         """
         self.hps = hps
-        # self.keep_prob = tf.placeholder(tf.float32)
         self.is_training = tf.placeholder(tf.bool)
         self._images = images
         self.labels = labels
         self.use_bottleneck = False
         self.num_classes = 10
         self.optimizer = optimizer
-        # self._extra_train_ops = []
         self.lr_decay = lr_decay
 
     def build_graph(self):
@@ -143,25 +141,28 @@ class ResNet(object):
 
         tf.summary.scalar('learning_rate', self.lrn_rate)
 
-        # trainable_variables = tf.trainable_variables()
-        # grads = tf.gradients(self.loss, trainable_variables)
+        trainable_variables = tf.trainable_variables()
+        grads = tf.gradients(self.loss, trainable_variables)
+
+        self.grad_norms = tf.global_norm(grads)
+        self.norms = tf.global_norm(trainable_variables)
 
         if self.optimizer == 'sgd':
             optimizer = tf.train.GradientDescentOptimizer(self.lrn_rate)
         elif self.optimizer == 'mom':
             optimizer = tf.train.MomentumOptimizer(self.lrn_rate, self.hps.momentum, use_nesterov=True)
 
-        # apply_op = optimizer.apply_gradients(
-        #     zip(grads, trainable_variables),
-        #     global_step=self.global_step, name='train_step')
-        #
-        # train_ops = [apply_op] + self._extra_train_ops
-        # self.train_op = tf.group(*train_ops)
+        apply_op = optimizer.apply_gradients(
+            zip(grads, trainable_variables),
+            global_step=self.global_step, name='train_step')
 
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        with tf.control_dependencies(update_ops):
+        train_ops = [apply_op] + update_ops
+        self.train_op = tf.group(*train_ops)
+
+        # with tf.control_dependencies(update_ops):
             # Ensures that we execute the update_ops before performing the train_step
-            self.train_op = optimizer.minimize(self.loss)
+            # self.train_op = optimizer.minimize(self.loss, global_step=self.global_step, name='train_step')
 
     def _residual(self, x, in_filter, out_filter, stride,
                   activate_before_residual=False, do_projection=False):

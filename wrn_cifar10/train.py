@@ -35,7 +35,6 @@ tf.app.flags.DEFINE_integer('batch_size', 128, """Number of images to process in
 tf.app.flags.DEFINE_float('l2_weight', 0.0005, """L2 loss weight applied all the weights""")
 tf.app.flags.DEFINE_float('momentum', 0.9, """The momentum of MomentumOptimizer""")
 tf.app.flags.DEFINE_float('initial_lr', 0.1, """Initial learning rate""")
-tf.app.flags.DEFINE_float('dropout', 0.3, """Dropout ratio""")
 tf.app.flags.DEFINE_string('lr_decay', "cosine", """LR Schedule""")
 
 # Training Configuration
@@ -154,7 +153,7 @@ def train():
     print('\tL2 loss weight: %f' % FLAGS.l2_weight)
     print('\tThe momentum optimizer: %f' % FLAGS.momentum)
     print('\tInitial learning rate: %f' % FLAGS.initial_lr)
-    print('\tDropout probability: %f' % FLAGS.dropout)
+    print('\tLearning decaying strategy: %s' % FLAGS.lr_decay)
 
     print('[Training Configuration]')
     print('\tTrain dir: %s' % FLAGS.train_dir)
@@ -242,6 +241,30 @@ def train():
         learning_curve_train_acc_epochs = []
         learning_curve_test_acc_epochs = []
 
+        grad_norms_mean = []
+        grad_norms_std = []
+        grad_norms_q05 = []
+        grad_norms_q10 = []
+        grad_norms_q25 = []
+        grad_norms_median = []
+        grad_norms_q75 = []
+        grad_norms_q90 = []
+        grad_norms_q95 = []
+        grad_norms_max = []
+        grad_norms_min = []
+
+        norms_mean = []
+        norms_std = []
+        norms_q05 = []
+        norms_q10 = []
+        norms_q25 = []
+        norms_median = []
+        norms_q75 = []
+        norms_q90 = []
+        norms_q95 = []
+        norms_max = []
+        norms_min = []
+
         runtime_train_epochs = []
         runtime_valid_epochs = []
         runtime_test_epochs = []
@@ -251,17 +274,24 @@ def train():
             train_acc = 0
             duration_train = 0
 
+            norms = []
+            grad_norms = []
+
             updates_per_epoch = 0
             for batch in iterate_minibatches(X_train, y_train, FLAGS.batch_size, shuffle=True, augment=True):
                 start_time_train = time.time()
                 train_images, train_labels = batch
 
                 # Update model parameters
-                _, lr_value, loss_value, acc_value, train_summary_str = \
-                    sess.run([network.train_op, network.lrn_rate, network.loss, network.acc, train_summary_op],
+                _, lr_value, loss_value, acc_value, train_summary_str, norm, grad_norm = \
+                    sess.run([network.train_op, network.lrn_rate, network.loss,
+                              network.acc, train_summary_op, network.norms, network.grad_norms],
                              feed_dict={images: train_images,
                                         labels: train_labels,
                                         network.is_training: True})
+
+                norms.append(norm)
+                grad_norms.append(grad_norm)
 
                 learning_curve_train_loss_updates.append(float(loss_value))
                 learning_curve_train_acc_updates.append(float(acc_value))
@@ -283,6 +313,30 @@ def train():
             learning_curve_train_acc_epochs.append(float(train_acc / updates_per_epoch))
 
             runtime_train_epochs.append(float(duration_train))
+
+            grad_norms_mean.append(float(np.mean(grad_norms)))
+            grad_norms_std.append(float(np.std(grad_norms)))
+            grad_norms_q05.append(float(np.percentile(grad_norms, q=5)))
+            grad_norms_q10.append(float(np.percentile(grad_norms, q=10)))
+            grad_norms_q25.append(float(np.percentile(grad_norms, q=25)))
+            grad_norms_median.append(float(np.median(grad_norms)))
+            grad_norms_q75.append(float(np.percentile(grad_norms, q=75)))
+            grad_norms_q90.append(float(np.percentile(grad_norms, q=90)))
+            grad_norms_q95.append(float(np.percentile(grad_norms, q=95)))
+            grad_norms_max.append(float(np.max(grad_norms)))
+            grad_norms_min.append(float(np.min(grad_norms)))
+
+            norms_mean.append(float(np.mean(norms)))
+            norms_std.append(float(np.std(norms)))
+            norms_q05.append(float(np.percentile(norms, q=5)))
+            norms_q10.append(float(np.percentile(norms, q=10)))
+            norms_q25.append(float(np.percentile(norms, q=25)))
+            norms_median.append(float(np.median(norms)))
+            norms_q75.append(float(np.percentile(norms, q=75)))
+            norms_q90.append(float(np.percentile(norms, q=90)))
+            norms_q95.append(float(np.percentile(norms, q=95)))
+            norms_max.append(float(np.max(norms)))
+            norms_min.append(float(np.min(norms)))
 
             # Validate
             duration_valid, valid_loss, valid_acc = 0.0, 0.0, 0.0
@@ -388,6 +442,30 @@ def train():
         results["runtime_train_epochs"] = runtime_train_epochs
         results["runtime_test_epochs"] = runtime_test_epochs
         results["runtime_valid_epochs"] = runtime_valid_epochs
+
+        results["grad_norms_mean"] = grad_norms_mean
+        results["grad_norms_std"] = grad_norms_std
+        results["grad_norms_q05"] = grad_norms_q05
+        results["grad_norms_q10"] = grad_norms_q10
+        results["grad_norms_q25"] = grad_norms_q25
+        results["grad_norms_median"] = grad_norms_median
+        results["grad_norms_q75"] = grad_norms_q75
+        results["grad_norms_q90"] = grad_norms_q90
+        results["grad_norms_q95"] = grad_norms_q95
+        results["grad_norms_max"] = grad_norms_max
+        results["grad_norms_min"] = grad_norms_min
+
+        results["norms_mean"] = norms_mean
+        results["norms_std"] = norms_std
+        results["norms_q05"] = norms_q05
+        results["norms_q10"] = norms_q10
+        results["norms_q25"] = norms_q25
+        results["norms_median"] = norms_median
+        results["norms_q75"] = norms_q75
+        results["norms_q90"] = norms_q90
+        results["norms_q95"] = norms_q95
+        results["norms_max"] = norms_max
+        results["norms_min"] = norms_min
 
         opts = tf.profiler.ProfileOptionBuilder.float_operation()
         flops = tf.profiler.profile(g, run_meta=run_meta, cmd='op', options=opts)
