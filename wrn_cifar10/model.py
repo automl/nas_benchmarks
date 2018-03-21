@@ -9,7 +9,10 @@ HParams = namedtuple('HParams',
                      'n_filters_1, n_filters_2, n_filters_3, '
                      'stride_1, stride_2, stride_3, depthwise, '
                      'num_residual_units_1, num_residual_units_2, num_residual_units_3, '
-                     'k, weight_decay, momentum')
+                     'k, weight_decay, momentum, use_nesterov, '
+                     'activation_1, activation_2, activation_3, '
+                     'n_conv_layers_1, n_conv_layers_2, n_conv_layers_3, '
+                     'dropout_1, dropout_2, dropout_3')
 
 
 def step_decay(learning_rate,
@@ -91,27 +94,39 @@ class ResNet(object):
 
         with tf.variable_scope('unit_1_0'):
             x = res_func(x, filters[0], filters[1], self._stride_arr(strides[0]),
-                         activate_before_residual[0], do_projection=True)
+                         activate_before_residual[0], do_projection=True,
+                         activation=self.hps.activation_1, n_conv_layers=self.hps.n_conv_layers_1,
+                         dropout_rate=self.hps.dropout_1)
 
         for i in six.moves.range(1, self.hps.num_residual_units_1):
             with tf.variable_scope('unit_1_%d' % i):
-                x = res_func(x, filters[1], filters[1], self._stride_arr(1), False)
+                x = res_func(x, filters[1], filters[1], self._stride_arr(1), False,
+                             activation=self.hps.activation_1,  n_conv_layers=self.hps.n_conv_layers_1,
+                             dropout_rate=self.hps.dropout_1)
 
         with tf.variable_scope('unit_2_0'):
             x = res_func(x, filters[1], filters[2], self._stride_arr(strides[1]),
-                         activate_before_residual[1], do_projection=True)
+                         activate_before_residual[1], do_projection=True,
+                         activation=self.hps.activation_2, n_conv_layers=self.hps.n_conv_layers_2,
+                         dropout_rate=self.hps.dropout_2)
 
         for i in six.moves.range(1, self.hps.num_residual_units_2):
             with tf.variable_scope('unit_2_%d' % i):
-                x = res_func(x, filters[2], filters[2], self._stride_arr(1), False)
+                x = res_func(x, filters[2], filters[2], self._stride_arr(1), False,
+                             activation=self.hps.activation_2, n_conv_layers=self.hps.n_conv_layers_2,
+                             dropout_rate=self.hps.dropout_2)
 
         with tf.variable_scope('unit_3_0'):
             x = res_func(x, filters[2], filters[3], self._stride_arr(strides[2]),
-                         activate_before_residual[2], do_projection=True)
+                         activate_before_residual[2], do_projection=True,
+                         activation=self.hps.activation_3, n_conv_layers=self.hps.n_conv_layers_3,
+                         dropout_rate=self.hps.dropout_3)
 
         for i in six.moves.range(1, self.hps.num_residual_units_3):
             with tf.variable_scope('unit_3_%d' % i):
-                x = res_func(x, filters[3], filters[3], self._stride_arr(1), False)
+                x = res_func(x, filters[3], filters[3], self._stride_arr(1), False,
+                             activation=self.hps.activation_3, n_conv_layers=self.hps.n_conv_layers_3,
+                             dropout_rate=self.hps.dropout_3)
 
         with tf.variable_scope('unit_last'):
             x = tf.contrib.layers.batch_norm(x, center=True, scale=True,
@@ -150,7 +165,8 @@ class ResNet(object):
         if self.optimizer == 'sgd':
             optimizer = tf.train.GradientDescentOptimizer(self.lrn_rate)
         elif self.optimizer == 'mom':
-            optimizer = tf.train.MomentumOptimizer(self.lrn_rate, self.hps.momentum, use_nesterov=True)
+            optimizer = tf.train.MomentumOptimizer(self.lrn_rate, self.hps.momentum,
+                                                   use_nesterov=self.hps.use_nesterov)
 
         apply_op = optimizer.apply_gradients(
             zip(grads, trainable_variables),
@@ -161,33 +177,55 @@ class ResNet(object):
         self.train_op = tf.group(*train_ops)
 
         # with tf.control_dependencies(update_ops):
-            # Ensures that we execute the update_ops before performing the train_step
-            # self.train_op = optimizer.minimize(self.loss, global_step=self.global_step, name='train_step')
+        #     Ensures that we execute the update_ops before performing the train_step
+        #     self.train_op = optimizer.minimize(self.loss, global_step=self.global_step, name='train_step')
 
     def _residual(self, x, in_filter, out_filter, stride,
-                  activate_before_residual=False, do_projection=False):
+                  activate_before_residual=False, do_projection=False,
+                  activation="relu", n_conv_layers=2, dropout_rate=0):
         """Residual unit with 2 sub layers."""
         if activate_before_residual:
             with tf.variable_scope('shared_activation'):
                 x = tf.contrib.layers.batch_norm(x, center=True,
                                                  scale=True, is_training=self.is_training)
-                x = tf.nn.relu(x)
+
+                if activation == "relu":
+                    x = tf.nn.relu(x)
+                elif activation == "elu":
+                    x = tf.nn.elu(x)
+                elif activation == "leaky_relu":
+                    x = tf.nn.leaky_relu(x)
                 orig_x = x
         else:
             with tf.variable_scope('residual_only_activation'):
                 orig_x = x
                 x = tf.contrib.layers.batch_norm(x, center=True,
                                                  scale=True, is_training=self.is_training)
-                x = tf.nn.relu(x)
+                if activation == "relu":
+                    x = tf.nn.relu(x)
+                elif activation == "elu":
+                    x = tf.nn.elu(x)
+                elif activation == "leaky_relu":
+                    x = tf.nn.leaky_relu(x)
 
         with tf.variable_scope('sub1'):
             x = self._conv('conv1', x, 3, in_filter, out_filter, stride)
 
-        with tf.variable_scope('sub2'):
-            x = tf.contrib.layers.batch_norm(x, center=True,
-                                             scale=True, is_training=self.is_training)
-            x = tf.nn.relu(x)
-            x = self._conv('conv2', x, 3, out_filter, out_filter, [1, 1, 1, 1])
+        for i in range(1, n_conv_layers):
+
+            with tf.variable_scope('sub%d' % (i+1)):
+                x = tf.contrib.layers.batch_norm(x, center=True,
+                                                 scale=True, is_training=self.is_training)
+                if activation == "relu":
+                    x = tf.nn.relu(x)
+                elif activation == "elu":
+                    x = tf.nn.elu(x)
+                elif activation == "leaky_relu":
+                    x = tf.nn.leaky_relu(x)
+
+                x = tf.layers.dropout(x, rate=dropout_rate, training=self.is_training)
+
+                x = self._conv('conv%d' % (i+1), x, 3, out_filter, out_filter, [1, 1, 1, 1])
 
         with tf.variable_scope('sub_add'):
             # if in_filter != out_filter:
