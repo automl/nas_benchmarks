@@ -95,7 +95,7 @@ def is_python_3():
 
 
 def unpickle(filename):
-  with open(filename, 'rb') as f:
+  with gfile.Open(filename, 'rb') as f:
     if is_python_3():
       return pickle.load(f, encoding='latin1')  # pylint: disable=unexpected-keyword-arg
     else:
@@ -595,9 +595,8 @@ def train():
     flops = tf.profiler.profile(g, run_meta=run_meta, cmd='op', options=opts)
     results['flops'] = flops.total_float_ops
 
-    fh = open(os.path.join(FLAGS.train_dir, 'results.json'), 'w')
-    json.dump(results, fh)
-    fh.close()
+    with gfile.Open(os.path.join(FLAGS.train_dir, 'results.json'), 'w') as fh:
+      json.dump(results, fh)
 
     # Compute final validation prediction
     valid_predictions = None
@@ -619,9 +618,9 @@ def train():
         valid_predictions = np.concatenate(
             (valid_predictions, predictions), axis=0)
 
-    fh = open(os.path.join(FLAGS.train_dir, 'valid_predictions.npy'), 'wb')
-    np.save(fh, valid_predictions)
-    fh.close()
+    with gfile.Open(
+        os.path.join(FLAGS.train_dir, 'valid_predictions.npy'), 'wb') as fh:
+      np.save(fh, valid_predictions)
 
     # Compute final test prediction
     test_predictions = None
@@ -642,9 +641,9 @@ def train():
         test_predictions = np.concatenate(
             (test_predictions, predictions), axis=0)
 
-    fh = open(os.path.join(FLAGS.train_dir, 'test_predictions.npy'), 'wb')
-    np.save(fh, test_predictions)
-    fh.close()
+    with gfile.Open(
+        os.path.join(FLAGS.train_dir, 'test_predictions.npy'), 'wb') as fh:
+      np.save(fh, test_predictions)
 
 
 def main(argv):
