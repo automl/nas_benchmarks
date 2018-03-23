@@ -4,7 +4,11 @@ Requires: TensorFlow 1.6 or later.
 
 To train a WRN on CIFAR-10:
 
-    python train.py \
+    export PATH_TO_DATASET=...
+    export OUTPUT_DIR=...
+
+    bazel run wrn_cifar10:train -- \
+      --alsologtostderr \
       --data_dir ${PATH_TO_DATASET}/cifar-10-batches-py/ \
       --train_dir ${OUTPUT_DIR} \
       --num_epochs 20 \
