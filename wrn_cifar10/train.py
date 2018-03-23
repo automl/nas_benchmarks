@@ -29,6 +29,15 @@ tf.app.flags.DEFINE_integer('stride_2', 2, """Stride in second group.""")
 tf.app.flags.DEFINE_integer('stride_3', 2, """Stride in third group.""")
 tf.app.flags.DEFINE_integer('k', 10, """Network width multiplier""")
 tf.app.flags.DEFINE_integer('depthwise', 0, """Whether to use depthwise convolutions""")
+tf.app.flags.DEFINE_string('activation_1', "relu", """Activation function for the first group""")
+tf.app.flags.DEFINE_string('activation_2', "relu", """Activation function for the second group""")
+tf.app.flags.DEFINE_string('activation_3', "relu", """Activation function for the third group""")
+tf.app.flags.DEFINE_integer('n_conv_layers_1', 2, """Number of convolutions in residual block for the first group""")
+tf.app.flags.DEFINE_integer('n_conv_layers_2', 2, """Number of convolutions in residual block for the second group""")
+tf.app.flags.DEFINE_integer('n_conv_layers_3', 2, """Number of convolutions in residual block for the third group""")
+tf.app.flags.DEFINE_float('dropout_1', 0, """Dropout for the first group""")
+tf.app.flags.DEFINE_float('dropout_2', 0, """Dropout for the second group""")
+tf.app.flags.DEFINE_float('dropout_3', 0, """Dropout for the third group""")
 
 # Optimization Configuration
 tf.app.flags.DEFINE_integer('batch_size', 128, """Number of images to process in a batch.""")
@@ -36,6 +45,9 @@ tf.app.flags.DEFINE_float('l2_weight', 0.0005, """L2 loss weight applied all the
 tf.app.flags.DEFINE_float('momentum', 0.9, """The momentum of MomentumOptimizer""")
 tf.app.flags.DEFINE_float('initial_lr', 0.1, """Initial learning rate""")
 tf.app.flags.DEFINE_string('lr_decay', "cosine", """LR Schedule""")
+tf.app.flags.DEFINE_integer('use_nesterov', 0, """Whether to use Nesterov momentum.""")
+
+tf.app.flags.DEFINE_float('dropout', 0.1, """Dropout""")
 
 # Training Configuration
 tf.app.flags.DEFINE_string('train_dir', './train', """Directory where to write log and checkpoint.""")
@@ -44,6 +56,7 @@ tf.app.flags.DEFINE_integer('checkpoint_interval', 1, """Number of epochs to sav
 tf.app.flags.DEFINE_float('gpu_fraction', 0.95, """The fraction of GPU memory to be allocated""")
 tf.app.flags.DEFINE_boolean('log_device_placement', False, """Whether to log device placement.""")
 tf.app.flags.DEFINE_boolean('do_save', False, """Whether to save checkpoints.""")
+tf.app.flags.DEFINE_integer('training_time', 7200, """Training time in seconds.""")
 
 
 FLAGS = tf.app.flags.FLAGS
@@ -148,12 +161,22 @@ def train():
     print('\tStride third group: %d' % FLAGS.stride_3)
     print('\tUse depthwise convolutions: %d' % FLAGS.depthwise)
     print('\tNetwork width multiplier: %d' % FLAGS.k)
+    print('\tActivation function first group: %s' % FLAGS.activation_1)
+    print('\tActivation function second group: %s' % FLAGS.activation_2)
+    print('\tActivation function third group: %s' % FLAGS.activation_3)
+    print('\tNumber of convolutions in residual block first group: %d' % FLAGS.n_conv_layers_1)
+    print('\tNumber of convolutions in residual block second group: %d' % FLAGS.n_conv_layers_2)
+    print('\tNumber of convolutions in residual block third group: %d' % FLAGS.n_conv_layers_3)
+    print('\tDropout in residual block first group: %f' % FLAGS.dropout_1)
+    print('\tDropout in residual block second group: %f' % FLAGS.dropout_2)
+    print('\tDropout in residual block third group: %f' % FLAGS.dropout_3)
 
     print('[Optimization Configuration]')
     print('\tL2 loss weight: %f' % FLAGS.l2_weight)
     print('\tThe momentum optimizer: %f' % FLAGS.momentum)
     print('\tInitial learning rate: %f' % FLAGS.initial_lr)
     print('\tLearning decaying strategy: %s' % FLAGS.lr_decay)
+    print('\tNesterov Momentum: %s' % bool(FLAGS.use_nesterov))
 
     print('[Training Configuration]')
     print('\tTrain dir: %s' % FLAGS.train_dir)
@@ -161,6 +184,7 @@ def train():
     print('\tSteps per saving checkpoints: %d' % FLAGS.checkpoint_interval)
     print('\tGPU memory fraction: %f' % FLAGS.gpu_fraction)
     print('\tLog device placement: %d' % FLAGS.log_device_placement)
+    print('\tTraining time: %d' % FLAGS.training_time)
 
     with tf.Graph().as_default() as g:
 
@@ -191,7 +215,18 @@ def train():
                             weight_decay=FLAGS.l2_weight,
                             initial_lr=FLAGS.initial_lr,
                             decay_steps=int(FLAGS.num_epochs * (X_train.shape[0] // FLAGS.batch_size)),
-                            momentum=FLAGS.momentum)
+                            momentum=FLAGS.momentum,
+                            use_nesterov=bool(FLAGS.use_nesterov),
+                            activation_1=FLAGS.activation_1,
+                            activation_2=FLAGS.activation_2,
+                            activation_3=FLAGS.activation_3,
+                            n_conv_layers_1=FLAGS.n_conv_layers_1,
+                            n_conv_layers_2=FLAGS.n_conv_layers_2,
+                            n_conv_layers_3=FLAGS.n_conv_layers_3,
+                            dropout_1=FLAGS.dropout_1,
+                            dropout_2=FLAGS.dropout_2,
+                            dropout_3=FLAGS.dropout_3)
+
         network = resnet.ResNet(hp, images, labels, lr_decay=FLAGS.lr_decay)
         network.build_graph()
 
@@ -269,7 +304,17 @@ def train():
         runtime_valid_epochs = []
         runtime_test_epochs = []
 
-        for e in range(1, FLAGS.num_epochs+1):
+        start_training_time = time.time()
+
+        duration_last_epoch = 0
+        used_budget = 0
+        e = 1
+
+        # for e in range(1, FLAGS.num_epochs+1):
+
+        while (e < FLAGS.num_epochs+1) and \
+                (used_budget + 1.1 * duration_last_epoch < FLAGS.training_time):
+
             train_loss = 0
             train_acc = 0
             duration_train = 0
@@ -419,6 +464,10 @@ def train():
                 if (e > init_step and e % FLAGS.checkpoint_interval == 0) or (e + 1) == FLAGS.num_epochs:
                     checkpoint_path = os.path.join(FLAGS.train_dir, 'model.ckpt')
                     saver.save(sess, checkpoint_path, global_step=int(e * FLAGS.batch_size))
+
+            duration_last_epoch = (time.time()-start_training_time) - used_budget
+            used_budget += duration_last_epoch
+            e += 1
 
         # Save results
         results = dict()
