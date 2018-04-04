@@ -15,7 +15,7 @@ gfile = tf.gfile
 IMAGE_SIZE = 32
 
 flags.DEFINE_string('model_dir', './train', """Directory where model checkpoint are stored.""")
-flags.DEFINE_integer('epoch_id', 20, """Epoch number""")
+flags.DEFINE_integer('epoch_id', 28125, """Epoch number""")
 flags.DEFINE_string('save_dir', './output', """Directory where metrics will be stored.""")
 
 
@@ -124,7 +124,7 @@ def evaluate():
 
         saver = tf.train.Saver(tf.all_variables(), max_to_keep=10000)
 
-        saver.restore(sess, os.path.join(FLAGS.train_dir, "model.ckpt-28125"))
+        saver.restore(sess, os.path.join(FLAGS.train_dir, "model.ckpt-%d" % epoch))
 
         # Validate
         duration_valid, valid_loss, valid_acc = 0.0, 0.0, 0.0
@@ -184,8 +184,6 @@ def evaluate():
 
         results["flops"] = flops.total_float_ops
 
-        from IPython import embed
-        embed()
         fh = open(os.path.join(FLAGS.save_dir, "results.json"), "w")
         json.dump(results, fh)
         fh.close()
