@@ -1,6 +1,11 @@
 package(default_visibility = ["//visibility:public"])
 
 py_library(
+    name = "data",
+    srcs = ["data.py"],
+)
+
+py_library(
     name = "model",
     srcs = ["model.py"],
 )
@@ -11,6 +16,7 @@ py_binary(
         "train.py",
     ],
     deps = [
+        ":data",
         ":model",
     ],
 )

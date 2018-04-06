@@ -4,26 +4,49 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from collections import namedtuple
-
 import numpy as np
 import six
 import tensorflow as tf
 
-HParams = namedtuple(
+from typing import Any, Dict, List, Optional, NamedTuple, Text, Union  # pytype: disable=not-supported-yet
+
+# pylint: disable=invalid-name
+HParams = NamedTuple(
     'HParams',
-    'batch_size, initial_lr, decay_steps, '
-    'n_filters_1, n_filters_2, n_filters_3, '
-    'stride_1, stride_2, stride_3, depthwise, '
-    'num_residual_units_1, num_residual_units_2, num_residual_units_3, '
-    'k, weight_decay, momentum, use_nesterov, '
-    'activation_1, activation_2, activation_3, '
-    'n_conv_layers_1, n_conv_layers_2, n_conv_layers_3, '
-    'dropout_1, dropout_2, dropout_3',
+    [
+        ('batch_size', int),
+        ('initial_lr', float),
+        ('decay_steps', int),
+        ('n_filters_1', int),
+        ('n_filters_2', int),
+        ('n_filters_3', int),
+        ('stride_1', int),
+        ('stride_2', int),
+        ('stride_3', int),
+        ('depthwise', bool),
+        ('num_residual_units_1', int),
+        ('num_residual_units_2', int),
+        ('num_residual_units_3', int),
+        ('k', int),
+        ('weight_decay', float),
+        ('momentum', float),
+        ('use_nesterov', bool),
+        ('activation_1', Text),
+        ('activation_2', Text),
+        ('activation_3', Text),
+        ('n_conv_layers_1', int),
+        ('n_conv_layers_2', int),
+        ('n_conv_layers_3', int),
+        ('dropout_1', float),
+        ('dropout_2', float),
+        ('dropout_3', float),
+    ],
 )
 
+# pylint: enable=invalid-name
 
-def step_decay(learning_rate, global_step):
+
+def step_decay(learning_rate: float, global_step: tf.Tensor) -> tf.Tensor:
   """Calculates learning rate as a function of global step."""
 
   def f1():
@@ -49,18 +72,38 @@ def step_decay(learning_rate, global_step):
 class ResNet(object):
   """ResNet model."""
 
-  def __init__(self, hps, images, labels, lr_decay='cosine', optimizer='mom'):
+  def __init__(
+      self,
+      hps: HParams,
+      tpu_only_ops: bool,
+      use_tpu: bool,
+      is_training: Optional[bool],
+      images: tf.Tensor,
+      labels: tf.Tensor,
+      lr_decay: Text = 'cosine',
+      optimizer: Text = 'mom',
+  ):
     """ResNet constructor.
 
     Args:
       hps: Hyperparameters.
+      tpu_only_ops: Whether to restrict to ops that can run on TPUs.
+      use_tpu: Whether to actually use the TPU.
+      is_training: If provided, specifies whether this graph is constructed
+        for training.
+        Else a placeholder will be created.
       images: Batches of images. [batch_size, image_size, image_size, 3]
       labels: Batches of labels. [batch_size, num_classes]
       lr_decay: Learning rate decay method.
       optimizer: Optmization method.
     """
     self.hps = hps
-    self.is_training = tf.placeholder(tf.bool)
+    self.tpu_only_ops = tpu_only_ops
+    self.use_tpu = use_tpu
+    if is_training is not None:
+      self.is_training = is_training
+    else:
+      self.is_training = tf.placeholder(tf.bool)
     self._images = images
     self.labels = labels
     self.use_bottleneck = False
@@ -68,18 +111,24 @@ class ResNet(object):
     self.optimizer = optimizer
     self.lr_decay = lr_decay
 
+    # Set later.
+    self.global_step = None
+    self.summaries = None
+    self.acc = None
+
   def build_graph(self):
     """Build a whole graph for the model."""
     self.global_step = tf.train.get_or_create_global_step()
     self._build_model()
     self._build_train_op()
-    self.summaries = tf.summary.merge_all()
+    if not self.tpu_only_ops:
+      self.summaries = tf.summary.merge_all()
 
     labels = tf.cast(self.labels, tf.int64)
     predict = tf.argmax(self.predictions, axis=1)
     self.acc = tf.reduce_mean(tf.to_float(tf.equal(predict, labels)))
 
-  def _stride_arr(self, stride):
+  def _stride_arr(self, stride: int):
     """Map a stride scalar to the stride array for tf.nn.conv2d."""
     return [1, stride, stride, 1]
 
@@ -194,7 +243,8 @@ class ResNet(object):
       self.loss = tf.reduce_mean(xent, name='xent')
       self.loss += self._decay()
 
-      tf.summary.scalar('loss', self.loss)
+      if not self.tpu_only_ops:
+        tf.summary.scalar('loss', self.loss)
 
   def _build_train_op(self):
     """Build training specific ops for the graph."""
@@ -205,7 +255,8 @@ class ResNet(object):
     elif self.lr_decay == 'step':
       self.lrn_rate = step_decay(self.hps.initial_lr, self.global_step)
 
-    tf.summary.scalar('learning_rate', self.lrn_rate)
+    if not self.tpu_only_ops:
+      tf.summary.scalar('learning_rate', self.lrn_rate)
 
     trainable_variables = tf.trainable_variables()
     grads = tf.gradients(self.loss, trainable_variables)
@@ -219,6 +270,9 @@ class ResNet(object):
       optimizer = tf.train.MomentumOptimizer(
           self.lrn_rate, self.hps.momentum, use_nesterov=self.hps.use_nesterov)
 
+    if self.use_tpu:
+      optimizer = tf.contrib.tpu.CrossShardOptimizer(optimizer)
+
     apply_op = optimizer.apply_gradients(
         zip(grads, trainable_variables),
         global_step=self.global_step,
@@ -228,16 +282,18 @@ class ResNet(object):
     train_ops = [apply_op] + update_ops
     self.train_op = tf.group(*train_ops)
 
-  def _residual(self,
-                x,
-                in_filter,
-                out_filter,
-                stride,
-                activate_before_residual=False,
-                do_projection=False,
-                activation='relu',
-                n_conv_layers=2,
-                dropout_rate=0):
+  def _residual(
+      self,
+      x: tf.Tensor,
+      in_filter: int,
+      out_filter: int,
+      stride: List[int],
+      activate_before_residual: bool = False,
+      do_projection: bool = False,
+      activation: Text = 'relu',
+      n_conv_layers: int = 2,
+      dropout_rate: float = 0.0,
+  ):
     """Residual unit with 2 sub layers."""
     if activate_before_residual:
       with tf.variable_scope('shared_activation'):
@@ -299,7 +355,15 @@ class ResNet(object):
         costs.append(tf.nn.l2_loss(var))
     return tf.multiply(self.hps.weight_decay, tf.add_n(costs))
 
-  def _conv(self, name, x, filter_size, in_filters, out_filters, strides):
+  def _conv(
+      self,
+      name: Text,
+      x: tf.Tensor,
+      filter_size: int,
+      in_filters: int,
+      out_filters: int,
+      strides: List[int],
+  ):
     """Convolution."""
     with tf.variable_scope(name):
       if self.hps.depthwise == 1:
@@ -322,7 +386,7 @@ class ResNet(object):
             'biases', [out_filters], initializer=tf.constant_initializer(0))
         return tf.nn.bias_add(conv, biases)
 
-  def _fully_connected(self, x, out_dim):
+  def _fully_connected(self, x: tf.Tensor, out_dim: int):
     """FullyConnected layer for final output."""
     x = tf.reshape(x, [self.hps.batch_size, -1])
     w = tf.get_variable(
@@ -332,6 +396,76 @@ class ResNet(object):
         'biases', [out_dim], initializer=tf.constant_initializer())
     return tf.nn.xw_plus_b(x, w, b)
 
-  def _global_avg_pool(self, x):
+  def _global_avg_pool(self, x: tf.Tensor):
     assert x.get_shape().ndims == 4
     return tf.reduce_mean(x, [1, 2])
+
+
+def make_estimator_model_fn(
+    tpu_only_ops: bool,
+    make_tpu_estimator_spec: bool,
+    use_tpu: bool,
+    lr_decay: Text,
+):
+  """Makes a model function for tf.estimator.Estimator.
+
+  Args:
+    tpu_only_ops: Whether to restrict to ops that can run on TPUs.
+    make_tpu_estimator_spec: Whether the function should return a
+      TPUEstimatorSpec rather than an EstimatorSpec.
+    use_tpu: Whether to actually use the TPU.
+    lr_decay: The learning rate decay method.
+
+  Returns:
+    A model function.
+
+  Raises:
+    ValueError: There are conflicting batch sizes.
+  """
+
+  def model_fn(
+      features: tf.Tensor,
+      labels: tf.Tensor,
+      mode: Text,
+      params: Dict[Text, Any],
+  ) -> Union[tf.estimator.EstimatorSpec, tf.contrib.tpu.TPUEstimatorSpec]:
+    """model_fn for tf.estimator.Estimator."""
+    input_op = features
+    del features
+    target_op = labels
+    del labels
+
+    batch_size = input_op.shape[0]
+    if batch_size != target_op.shape[0]:
+      raise ValueError('Batch size mismatch')
+    if 'batch_size' in params and batch_size != params['batch_size']:
+      raise ValueError('Batch size mismatch')
+
+    params.update({'batch_size': batch_size})
+    hp = HParams(**params)
+
+    network = ResNet(
+        hps=hp,
+        tpu_only_ops=tpu_only_ops,
+        use_tpu=use_tpu,
+        is_training=mode == tf.estimator.ModeKeys.TRAIN,
+        images=input_op,
+        labels=target_op,
+        lr_decay=lr_decay)
+    network.build_graph()
+
+    loss_op = network.loss
+    train_op = network.train_op
+
+    if make_tpu_estimator_spec:
+      return tf.contrib.tpu.TPUEstimatorSpec(
+          mode=mode, loss=loss_op, train_op=train_op)
+    else:
+      return tf.estimator.EstimatorSpec(
+          mode=mode,
+          predictions={},
+          loss=loss_op,
+          train_op=train_op,
+          eval_metric_ops={})
+
+  return model_fn

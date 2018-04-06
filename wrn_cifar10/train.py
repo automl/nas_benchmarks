@@ -6,13 +6,12 @@ from __future__ import print_function
 
 import json
 import os
-import pickle
-import sys
 import time
 
 import numpy as np
 import tensorflow as tf
 
+from wrn_cifar10 import data  # pylint: disable=g-bad-import-order
 from wrn_cifar10 import model as resnet  # pylint: disable=g-bad-import-order
 
 app = tf.app
@@ -41,8 +40,8 @@ flags.DEFINE_integer('stride_1', 1, """Stride in first group.""")
 flags.DEFINE_integer('stride_2', 2, """Stride in second group.""")
 flags.DEFINE_integer('stride_3', 2, """Stride in third group.""")
 flags.DEFINE_integer('k', 10, """Network width multiplier""")
-flags.DEFINE_integer('depthwise', 0,
-                     """Whether to use depthwise convolutions""")
+flags.DEFINE_bool('depthwise', False,
+                  """Whether to use depthwise convolutions""")
 flags.DEFINE_string('activation_1', 'relu',
                     """Activation function for the first group""")
 flags.DEFINE_string('activation_2', 'relu',
@@ -87,102 +86,54 @@ flags.DEFINE_boolean('log_device_placement', False,
 flags.DEFINE_boolean('do_save', False, """Whether to save checkpoints.""")
 flags.DEFINE_integer('training_time', 7200, """Training time in seconds.""")
 
+flags.DEFINE_bool('use_estimator_code_path', False,
+                  'Use the estimator code path.')
+flags.DEFINE_bool('use_tpu_estimator', False,
+                  'Whether to use the TPUEstimator vs the standard Estimator.')
+flags.DEFINE_bool('use_tpu', False, 'Use TPUs rather than plain CPUs')
+flags.DEFINE_string('master', 'local', 'GRPC URL of the Cloud TPU instance.')
+flags.DEFINE_integer('iterations_per_loop', 1 << 6,
+                     'Number of iterations per TPU training loop.')
+
 FLAGS = flags.FLAGS
 
-
-def is_python_3():
-  return sys.version[0] == '3'
-
-
-def unpickle(filename):
-  with gfile.Open(filename, 'rb') as f:
-    if is_python_3():
-      return pickle.load(f, encoding='latin1')  # pylint: disable=unexpected-keyword-arg
-    else:
-      return pickle.load(f)
+_NUM_TRAIN_EXAMPLES = 45000
+_NUM_TRAIN_EPOCHS = 20
 
 
-def load_data(dataset_dir):
-  """Loads CIFAR-10 data from disk."""
-  xs = []
-  ys = []
-  for j in range(5):
-    d = unpickle(os.path.join(dataset_dir, 'data_batch_%d' % (j + 1)))
-    x = d['data']
-    y = d['labels']
-    xs.append(x)
-    ys.append(y)
-
-  d = unpickle(os.path.join(dataset_dir, 'test_batch'))
-  xs.append(d['data'])
-  ys.append(d['labels'])
-
-  x = np.concatenate(xs) / np.float32(255)
-  y = np.concatenate(ys)
-  x = np.dstack((x[:, :1024], x[:, 1024:2048], x[:, 2048:]))
-  x = x.reshape((x.shape[0], 32, 32, 3))
-  X_train = x[0:50000, :, :, :]  # pylint: disable=invalid-name
-  y_train = y[0:50000]
-
-  X_test = x[50000:, :, :, :]  # pylint: disable=invalid-name
-  y_test = y[50000:]
-
-  # subtract per-pixel mean
-  pixel_mean = np.mean(X_train, axis=0)
-  X_train -= pixel_mean  # pylint: disable=invalid-name
-  X_test -= pixel_mean  # pylint: disable=invalid-name
-
-  # Split up additional validation set
-  X_valid = X_train[45000:]  # pylint: disable=invalid-name
-  y_valid = y_train[45000:]
-
-  X_train = X_train[:45000]  # pylint: disable=invalid-name
-  y_train = y_train[:45000]
-
-  logging.info('X_train shape: %r', X_train.shape)
-  logging.info('%d train samples', X_train.shape[0])
-  logging.info('%d valid samples', X_valid.shape[0])
-  logging.info('%d test samples', X_test.shape[0])
-
-  return X_train, y_train, X_valid, y_valid, X_test, y_test
+def make_hparams() -> resnet.HParams:
+  return resnet.HParams(
+      batch_size=FLAGS.batch_size,
+      num_residual_units_1=FLAGS.num_residual_units_1,
+      num_residual_units_2=FLAGS.num_residual_units_3,
+      num_residual_units_3=FLAGS.num_residual_units_2,
+      n_filters_1=FLAGS.n_filters_1,
+      n_filters_2=FLAGS.n_filters_2,
+      n_filters_3=FLAGS.n_filters_3,
+      depthwise=FLAGS.depthwise,
+      stride_1=FLAGS.stride_1,
+      stride_2=FLAGS.stride_2,
+      stride_3=FLAGS.stride_3,
+      k=FLAGS.k,
+      weight_decay=FLAGS.l2_weight,
+      initial_lr=FLAGS.initial_lr,
+      decay_steps=int(
+          FLAGS.num_epochs * (_NUM_TRAIN_EXAMPLES // FLAGS.batch_size)),
+      momentum=FLAGS.momentum,
+      use_nesterov=bool(FLAGS.use_nesterov),
+      activation_1=FLAGS.activation_1,
+      activation_2=FLAGS.activation_2,
+      activation_3=FLAGS.activation_3,
+      n_conv_layers_1=FLAGS.n_conv_layers_1,
+      n_conv_layers_2=FLAGS.n_conv_layers_2,
+      n_conv_layers_3=FLAGS.n_conv_layers_3,
+      dropout_1=FLAGS.dropout_1,
+      dropout_2=FLAGS.dropout_2,
+      dropout_3=FLAGS.dropout_3)
 
 
-def iterate_minibatches(inputs,
-                        targets,
-                        batchsize,
-                        shuffle=False,
-                        augment=False):
-  assert len(inputs) == len(targets)
-  if shuffle:
-    indices = np.arange(len(inputs))
-    np.random.shuffle(indices)
-  for start_idx in range(0, len(inputs) - batchsize + 1, batchsize):
-    if shuffle:
-      excerpt = indices[start_idx:start_idx + batchsize]
-    else:
-      excerpt = slice(start_idx, start_idx + batchsize)
-    if augment:
-      # as in paper :
-      # pad feature arrays with 4 pixels on each side
-      # and do random cropping of 32x32
-      padded = np.pad(
-          inputs[excerpt], ((0, 0), (4, 4), (4, 4), (0, 0)), mode='constant')
-      random_cropped = np.zeros(inputs[excerpt].shape, dtype=np.float32)
-      crops = np.random.random_integers(0, high=8, size=(batchsize, 2))
-      for r in range(batchsize):
-        random_cropped[r, :, :, :] = padded[r, crops[r, 0]:(
-            crops[r, 0] + 32), crops[r, 1]:(crops[r, 1] + 32), :]
-
-        # Randomly flip the image horizontally.
-        if np.random.rand() < .5:
-          random_cropped[r] = np.fliplr(random_cropped[r])
-      inp_exc = random_cropped
-    else:
-      inp_exc = inputs[excerpt]
-
-    yield inp_exc, targets[excerpt]
-
-
+# TODO(ericmc): Integrate this logic into the tf.estimator.Estimator code path
+# and remove FLAGS.use_estimator_code_path.
 def train():
   """Trains model and writes results to disk."""
   logging.info('[Dataset Configuration]')
@@ -199,7 +150,7 @@ def train():
   logging.info('Stride first group: %d', FLAGS.stride_1)
   logging.info('Stride second group: %d', FLAGS.stride_2)
   logging.info('Stride third group: %d', FLAGS.stride_3)
-  logging.info('Use depthwise convolutions: %d', FLAGS.depthwise)
+  logging.info('Use depthwise convolutions: %r', FLAGS.depthwise)
   logging.info('Network width multiplier: %d', FLAGS.k)
   logging.info('Activation function first group: %s', FLAGS.activation_1)
   logging.info('Activation function second group: %s', FLAGS.activation_2)
@@ -237,7 +188,7 @@ def train():
 
     # Load the data
     # pylint: disable=invalid-name
-    X_train, y_train, X_valid, y_valid, X_test, y_test = load_data(
+    X_train, y_train, X_valid, y_valid, X_test, y_test = data.load_data(
         FLAGS.data_dir)
     # pylint: enable=invalid-name
 
@@ -247,36 +198,16 @@ def train():
     labels = tf.placeholder(tf.int32, [FLAGS.batch_size])
 
     # Build model
-    hp = resnet.HParams(
-        batch_size=FLAGS.batch_size,
-        num_residual_units_1=FLAGS.num_residual_units_1,
-        num_residual_units_2=FLAGS.num_residual_units_3,
-        num_residual_units_3=FLAGS.num_residual_units_2,
-        n_filters_1=FLAGS.n_filters_1,
-        n_filters_2=FLAGS.n_filters_2,
-        n_filters_3=FLAGS.n_filters_3,
-        depthwise=FLAGS.depthwise,
-        stride_1=FLAGS.stride_1,
-        stride_2=FLAGS.stride_2,
-        stride_3=FLAGS.stride_3,
-        k=FLAGS.k,
-        weight_decay=FLAGS.l2_weight,
-        initial_lr=FLAGS.initial_lr,
-        decay_steps=int(FLAGS.num_epochs *
-                        (X_train.shape[0] // FLAGS.batch_size)),
-        momentum=FLAGS.momentum,
-        use_nesterov=bool(FLAGS.use_nesterov),
-        activation_1=FLAGS.activation_1,
-        activation_2=FLAGS.activation_2,
-        activation_3=FLAGS.activation_3,
-        n_conv_layers_1=FLAGS.n_conv_layers_1,
-        n_conv_layers_2=FLAGS.n_conv_layers_2,
-        n_conv_layers_3=FLAGS.n_conv_layers_3,
-        dropout_1=FLAGS.dropout_1,
-        dropout_2=FLAGS.dropout_2,
-        dropout_3=FLAGS.dropout_3)
+    hp = make_hparams()
 
-    network = resnet.ResNet(hp, images, labels, lr_decay=FLAGS.lr_decay)
+    network = resnet.ResNet(
+        hps=hp,
+        tpu_only_ops=False,
+        use_tpu=False,
+        is_training=None,
+        images=images,
+        labels=labels,
+        lr_decay=FLAGS.lr_decay)
     network.build_graph()
 
     # Summaries(training)
@@ -306,8 +237,8 @@ def train():
 
     # Start queue runners & summary_writer
     tf.train.start_queue_runners(sess=sess)
-    if not os.path.exists(FLAGS.train_dir):
-      os.mkdir(FLAGS.train_dir)
+    if not gfile.Exists(FLAGS.train_dir):
+      gfile.MkDir(FLAGS.train_dir)
     summary_writer = tf.summary.FileWriter(FLAGS.train_dir, sess.graph)
 
     # Training!
@@ -372,8 +303,8 @@ def train():
       grad_norms = []
 
       updates_per_epoch = 0
-      for batch in iterate_minibatches(
-          X_train, y_train, FLAGS.batch_size, shuffle=True, augment=True):
+      for batch in data.iterate_minibatches(
+          sess, X_train, y_train, FLAGS.batch_size, shuffle=True, augment=True):
         start_time_train = time.time()
         train_images, train_labels = batch
 
@@ -446,8 +377,13 @@ def train():
 
       start_time_valid = time.time()
       updates_per_epoch = 0
-      for batch in iterate_minibatches(
-          X_valid, y_valid, FLAGS.batch_size, shuffle=False, augment=False):
+      for batch in data.iterate_minibatches(
+          sess,
+          X_valid,
+          y_valid,
+          FLAGS.batch_size,
+          shuffle=False,
+          augment=False):
         valid_images, valid_labels = batch
         loss_value, acc_value = sess.run(
             [network.loss, network.acc],
@@ -489,8 +425,8 @@ def train():
       start_time_test = time.time()
 
       updates_per_epoch = 0
-      for batch in iterate_minibatches(
-          X_test, y_test, FLAGS.batch_size, shuffle=False, augment=False):
+      for batch in data.iterate_minibatches(
+          sess, X_test, y_test, FLAGS.batch_size, shuffle=False, augment=False):
         test_images, test_labels = batch
         loss_value, acc_value = sess.run(
             [network.loss, network.acc],
@@ -601,8 +537,8 @@ def train():
     # Compute final validation prediction
     valid_predictions = None
 
-    for batch in iterate_minibatches(
-        X_valid, y_valid, FLAGS.batch_size, shuffle=False, augment=False):
+    for batch in data.iterate_minibatches(
+        sess, X_valid, y_valid, FLAGS.batch_size, shuffle=False, augment=False):
       valid_images, valid_labels = batch
       predictions = sess.run(
           network.predictions,
@@ -624,8 +560,8 @@ def train():
 
     # Compute final test prediction
     test_predictions = None
-    for batch in iterate_minibatches(
-        X_test, y_test, FLAGS.batch_size, shuffle=False, augment=False):
+    for batch in data.iterate_minibatches(
+        sess, X_test, y_test, FLAGS.batch_size, shuffle=False, augment=False):
       test_images, test_labels = batch
       predictions = sess.run(
           network.predictions,
@@ -646,10 +582,72 @@ def train():
       np.save(fh, test_predictions)
 
 
+def train_estimator():
+  """Trains the model."""
+
+  if FLAGS.use_tpu_estimator:
+    logging.info('Training with TPUEstimator')
+
+    run_config = tf.contrib.tpu.RunConfig(
+        master=FLAGS.master,
+        evaluation_master=FLAGS.master,
+        model_dir=FLAGS.train_dir,
+        session_config=tf.ConfigProto(
+            allow_soft_placement=True, log_device_placement=True),
+        tpu_config=tf.contrib.tpu.TPUConfig(FLAGS.iterations_per_loop),
+        save_checkpoints_steps=_NUM_TRAIN_EXAMPLES // FLAGS.batch_size,
+        keep_checkpoint_max=None,
+    )
+    logging.info('model_dir: %r', run_config.model_dir)
+
+    # The batch size must be set by TPUEstimator.
+    hp = make_hparams()._asdict()
+    batch_size = hp['batch_size']
+    hp.pop('batch_size')
+
+    estimator = tf.contrib.tpu.TPUEstimator(
+        model_fn=resnet.make_estimator_model_fn(
+            tpu_only_ops=True,
+            use_tpu=FLAGS.use_tpu,
+            make_tpu_estimator_spec=True,
+            lr_decay=FLAGS.lr_decay),
+        use_tpu=FLAGS.use_tpu,
+        train_batch_size=batch_size,
+        config=run_config,
+        params=hp)
+  else:
+    logging.info('Training with Estimator')
+
+    run_config = tf.estimator.RunConfig()
+    # Override the default directory layout.
+    run_config = run_config.replace(model_dir=FLAGS.train_dir)
+    logging.info('model_dir: %r', run_config.model_dir)
+
+    hp = make_hparams()._asdict()
+
+    estimator = tf.estimator.Estimator(
+        config=run_config,
+        model_fn=resnet.make_estimator_model_fn(
+            tpu_only_ops=False,
+            use_tpu=False,
+            make_tpu_estimator_spec=False,
+            lr_decay=FLAGS.lr_decay),
+        params=hp)
+
+  num_train_steps = _NUM_TRAIN_EPOCHS * _NUM_TRAIN_EXAMPLES // FLAGS.batch_size
+  estimator.train(
+      input_fn=data.make_estimator_input_fn(
+          dataset_dir=FLAGS.data_dir, ds=data.DatasetSplit.TRAIN),
+      steps=num_train_steps)
+
+
 def main(argv):
   del argv  # Unused.
   logging.set_verbosity('INFO')
-  train()
+  if FLAGS.use_estimator_code_path:
+    train_estimator()
+  else:
+    train()
 
 
 if __name__ == '__main__':
