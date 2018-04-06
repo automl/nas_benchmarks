@@ -105,8 +105,8 @@ def make_hparams() -> resnet.HParams:
   return resnet.HParams(
       batch_size=FLAGS.batch_size,
       num_residual_units_1=FLAGS.num_residual_units_1,
-      num_residual_units_2=FLAGS.num_residual_units_3,
-      num_residual_units_3=FLAGS.num_residual_units_2,
+      num_residual_units_2=FLAGS.num_residual_units_2,
+      num_residual_units_3=FLAGS.num_residual_units_3,
       n_filters_1=FLAGS.n_filters_1,
       n_filters_2=FLAGS.n_filters_2,
       n_filters_3=FLAGS.n_filters_3,
