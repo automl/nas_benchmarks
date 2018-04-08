@@ -11,15 +11,14 @@ import time
 import numpy as np
 import tensorflow as tf
 
+from wrn_cifar10 import controller  # pylint: disable=g-bad-import-order
 from wrn_cifar10 import data  # pylint: disable=g-bad-import-order
-from wrn_cifar10 import model as resnet  # pylint: disable=g-bad-import-order
+from wrn_cifar10 import model  # pylint: disable=g-bad-import-order
 
 app = tf.app
-logging = tf.logging
 flags = tf.flags
 gfile = tf.gfile
-
-IMAGE_SIZE = 32
+logging = tf.logging
 
 # Dataset Configuration
 flags.DEFINE_string('data_dir', './cifar-10-batches-py/',
@@ -39,15 +38,19 @@ flags.DEFINE_integer('n_filters_3', 64, """Number of filters in third group.""")
 flags.DEFINE_integer('stride_1', 1, """Stride in first group.""")
 flags.DEFINE_integer('stride_2', 2, """Stride in second group.""")
 flags.DEFINE_integer('stride_3', 2, """Stride in third group.""")
+# TODO(ericmc): Make this name more informative.
 flags.DEFINE_integer('k', 10, """Network width multiplier""")
 flags.DEFINE_bool('depthwise', False,
                   """Whether to use depthwise convolutions""")
-flags.DEFINE_string('activation_1', 'relu',
-                    """Activation function for the first group""")
-flags.DEFINE_string('activation_2', 'relu',
-                    """Activation function for the second group""")
-flags.DEFINE_string('activation_3', 'relu',
-                    """Activation function for the third group""")
+flags.DEFINE_enum('activation_1', model.Activation.RELU.name,
+                  model.Activation.__members__,
+                  """Activation function for the first group""")
+flags.DEFINE_enum('activation_2', model.Activation.RELU.name,
+                  model.Activation.__members__,
+                  """Activation function for the second group""")
+flags.DEFINE_enum('activation_3', model.Activation.RELU.name,
+                  model.Activation.__members__,
+                  """Activation function for the third group""")
 flags.DEFINE_integer(
     'n_conv_layers_1', 2,
     """Number of convolutions in residual block for the first group""")
@@ -68,15 +71,17 @@ flags.DEFINE_float('l2_weight', 0.0005,
                    """L2 loss weight applied all the weights""")
 flags.DEFINE_float('momentum', 0.9, """The momentum of MomentumOptimizer""")
 flags.DEFINE_float('initial_lr', 0.1, """Initial learning rate""")
-flags.DEFINE_string('lr_decay', 'cosine', """LR Schedule""")
-flags.DEFINE_integer('use_nesterov', 0, """Whether to use Nesterov momentum.""")
+flags.DEFINE_enum('lr_decay', model.LRDecaySchedule.COSINE.name,
+                  model.LRDecaySchedule.__members__, """LR Schedule""")
+flags.DEFINE_bool('use_nesterov', False,
+                  """Whether to use Nesterov momentum.""")
 
 flags.DEFINE_float('dropout', 0.1, """Dropout""")
 
 # Training Configuration
 flags.DEFINE_string('train_dir', './train',
                     """Directory where to write log and checkpoint.""")
-flags.DEFINE_integer('num_epochs', 200, """Number of batches to run.""")
+flags.DEFINE_integer('num_epochs', 20, """Number of batches to run.""")
 flags.DEFINE_integer('checkpoint_interval', 1,
                      """Number of epochs to save parameters as a checkpoint""")
 flags.DEFINE_float('gpu_fraction', 0.95,
@@ -94,42 +99,55 @@ flags.DEFINE_bool('use_tpu', False, 'Use TPUs rather than plain CPUs')
 flags.DEFINE_string('master', 'local', 'GRPC URL of the Cloud TPU instance.')
 flags.DEFINE_integer('iterations_per_loop', 1 << 6,
                      'Number of iterations per TPU training loop.')
+flags.DEFINE_bool(
+    'save_disk_space', False,
+    'Whether to omit some state files to reduce disk space usage.')
+flags.DEFINE_integer('replicate', 0, 'The index of the replicate.')
 
+# More flags in shared_flags.py.
 FLAGS = flags.FLAGS
 
-_NUM_TRAIN_EXAMPLES = 45000
-_NUM_TRAIN_EPOCHS = 20
 
-
-def make_hparams() -> resnet.HParams:
-  return resnet.HParams(
-      batch_size=FLAGS.batch_size,
-      num_residual_units_1=FLAGS.num_residual_units_1,
-      num_residual_units_2=FLAGS.num_residual_units_2,
-      num_residual_units_3=FLAGS.num_residual_units_3,
+def make_hparams_from_flags() -> tf.contrib.training.HParams:
+  """Makes an HParams object from the provided flags."""
+  hp = tf.contrib.training.HParams(
+      # Optimization.
+      optimizer=model.Optimizer.MOMENTUM,
+      initial_lr=FLAGS.initial_lr,
+      lr_decay=model.LRDecaySchedule[FLAGS.lr_decay],
+      decay_steps=int(FLAGS.num_epochs *
+                      (controller.NUM_TRAIN_EXAMPLES // FLAGS.batch_size)),
+      weight_decay=FLAGS.l2_weight,
+      momentum=FLAGS.momentum,
+      use_nesterov=FLAGS.use_nesterov,
+      # Architecture.
       n_filters_1=FLAGS.n_filters_1,
       n_filters_2=FLAGS.n_filters_2,
       n_filters_3=FLAGS.n_filters_3,
-      depthwise=FLAGS.depthwise,
       stride_1=FLAGS.stride_1,
       stride_2=FLAGS.stride_2,
       stride_3=FLAGS.stride_3,
+      depthwise=FLAGS.depthwise,
+      num_residual_units_1=FLAGS.num_residual_units_1,
+      num_residual_units_2=FLAGS.num_residual_units_3,
+      num_residual_units_3=FLAGS.num_residual_units_2,
       k=FLAGS.k,
-      weight_decay=FLAGS.l2_weight,
-      initial_lr=FLAGS.initial_lr,
-      decay_steps=int(
-          FLAGS.num_epochs * (_NUM_TRAIN_EXAMPLES // FLAGS.batch_size)),
-      momentum=FLAGS.momentum,
-      use_nesterov=bool(FLAGS.use_nesterov),
-      activation_1=FLAGS.activation_1,
-      activation_2=FLAGS.activation_2,
-      activation_3=FLAGS.activation_3,
+      activation_1=model.Activation[FLAGS.activation_1],
+      activation_2=model.Activation[FLAGS.activation_2],
+      activation_3=model.Activation[FLAGS.activation_3],
       n_conv_layers_1=FLAGS.n_conv_layers_1,
       n_conv_layers_2=FLAGS.n_conv_layers_2,
       n_conv_layers_3=FLAGS.n_conv_layers_3,
       dropout_1=FLAGS.dropout_1,
       dropout_2=FLAGS.dropout_2,
-      dropout_3=FLAGS.dropout_3)
+      dropout_3=FLAGS.dropout_3,
+      # Misc.
+      batch_size=FLAGS.batch_size,
+      num_epochs=FLAGS.num_epochs,
+      replicate=FLAGS.replicate,
+  )
+
+  return model.validate(hp)
 
 
 # TODO(ericmc): Integrate this logic into the tf.estimator.Estimator code path
@@ -193,21 +211,20 @@ def train():
     # pylint: enable=invalid-name
 
     # Build a Graph that computes the predictions from the inference model.
-    images = tf.placeholder(tf.float32,
-                            [FLAGS.batch_size, IMAGE_SIZE, IMAGE_SIZE, 3])
+    images = tf.placeholder(
+        tf.float32, [FLAGS.batch_size, data.IMAGE_SIZE, data.IMAGE_SIZE, 3])
     labels = tf.placeholder(tf.int32, [FLAGS.batch_size])
 
     # Build model
-    hp = make_hparams()
+    hp = make_hparams_from_flags()
 
-    network = resnet.ResNet(
+    network = model.ResNet(
         hps=hp,
         tpu_only_ops=False,
         use_tpu=False,
         is_training=None,
         images=images,
-        labels=labels,
-        lr_decay=FLAGS.lr_decay)
+        labels=labels)
     network.build_graph()
 
     # Summaries(training)
@@ -237,8 +254,6 @@ def train():
 
     # Start queue runners & summary_writer
     tf.train.start_queue_runners(sess=sess)
-    if not gfile.Exists(FLAGS.train_dir):
-      gfile.MkDir(FLAGS.train_dir)
     summary_writer = tf.summary.FileWriter(FLAGS.train_dir, sess.graph)
 
     # Training!
@@ -582,70 +597,23 @@ def train():
       np.save(fh, test_predictions)
 
 
-def train_estimator():
-  """Trains the model."""
-
-  if FLAGS.use_tpu_estimator:
-    logging.info('Training with TPUEstimator')
-
-    run_config = tf.contrib.tpu.RunConfig(
-        master=FLAGS.master,
-        evaluation_master=FLAGS.master,
-        model_dir=FLAGS.train_dir,
-        session_config=tf.ConfigProto(
-            allow_soft_placement=True, log_device_placement=True),
-        tpu_config=tf.contrib.tpu.TPUConfig(FLAGS.iterations_per_loop),
-        save_checkpoints_steps=_NUM_TRAIN_EXAMPLES // FLAGS.batch_size,
-        keep_checkpoint_max=None,
-    )
-    logging.info('model_dir: %r', run_config.model_dir)
-
-    # The batch size must be set by TPUEstimator.
-    hp = make_hparams()._asdict()
-    batch_size = hp['batch_size']
-    hp.pop('batch_size')
-
-    estimator = tf.contrib.tpu.TPUEstimator(
-        model_fn=resnet.make_estimator_model_fn(
-            tpu_only_ops=True,
-            use_tpu=FLAGS.use_tpu,
-            make_tpu_estimator_spec=True,
-            lr_decay=FLAGS.lr_decay),
-        use_tpu=FLAGS.use_tpu,
-        train_batch_size=batch_size,
-        config=run_config,
-        params=hp)
-  else:
-    logging.info('Training with Estimator')
-
-    run_config = tf.estimator.RunConfig()
-    # Override the default directory layout.
-    run_config = run_config.replace(model_dir=FLAGS.train_dir)
-    logging.info('model_dir: %r', run_config.model_dir)
-
-    hp = make_hparams()._asdict()
-
-    estimator = tf.estimator.Estimator(
-        config=run_config,
-        model_fn=resnet.make_estimator_model_fn(
-            tpu_only_ops=False,
-            use_tpu=False,
-            make_tpu_estimator_spec=False,
-            lr_decay=FLAGS.lr_decay),
-        params=hp)
-
-  num_train_steps = _NUM_TRAIN_EPOCHS * _NUM_TRAIN_EXAMPLES // FLAGS.batch_size
-  estimator.train(
-      input_fn=data.make_estimator_input_fn(
-          dataset_dir=FLAGS.data_dir, ds=data.DatasetSplit.TRAIN),
-      steps=num_train_steps)
-
-
 def main(argv):
   del argv  # Unused.
   logging.set_verbosity('INFO')
+
+  if not gfile.Exists(FLAGS.train_dir):
+    gfile.MkDir(FLAGS.train_dir)
+
   if FLAGS.use_estimator_code_path:
-    train_estimator()
+    controller.train_estimator(
+        use_tpu_estimator=FLAGS.use_tpu_estimator,
+        use_tpu=FLAGS.use_tpu,
+        train_dir=FLAGS.train_dir,
+        data_dir=FLAGS.data_dir,
+        hp=make_hparams_from_flags(),
+        master=FLAGS.master,
+        iterations_per_loop=FLAGS.iterations_per_loop,
+        save_disk_space=FLAGS.save_disk_space)
   else:
     train()
 

@@ -10,12 +10,22 @@ py_library(
     srcs = ["model.py"],
 )
 
+py_library(
+    name = "controller",
+    srcs = ["controller.py"],
+    deps = [
+        ":data",
+        ":model",
+    ],
+)
+
 py_binary(
     name = "train",
     srcs = [
         "train.py",
     ],
     deps = [
+        ":controller",
         ":data",
         ":model",
     ],

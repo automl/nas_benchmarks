@@ -17,6 +17,8 @@ from typing import Any, Dict, Generator, Text, Tuple
 logging = tf.logging
 gfile = tf.gfile
 
+IMAGE_SIZE = 32
+
 # The size of the shuffle buffer.
 _SHUFFLE_BUFFER_SIZE = 1 << 14
 
@@ -60,7 +62,7 @@ def load_data(dataset_dir: Text) -> Tuple[np.ndarray, np.ndarray, np.ndarray,
   x = np.concatenate(xs) / np.float32(255)
   y = np.concatenate(ys)
   x = np.dstack((x[:, :1024], x[:, 1024:2048], x[:, 2048:]))
-  x = x.reshape((x.shape[0], 32, 32, 3))
+  x = x.reshape((x.shape[0], IMAGE_SIZE, IMAGE_SIZE, 3))
   X_train = x[0:50000, :, :, :]  # pylint: disable=invalid-name
   y_train = y[0:50000]
 
@@ -182,7 +184,8 @@ def make_estimator_input_fn(dataset_dir: Text, ds: DatasetSplit):
     An input function.
   """
 
-  def input_fn(params: Dict[Text, Any]) -> Tuple[tf.Tensor, tf.Tensor]:
+  def input_fn(
+      params: tf.contrib.training.HParams) -> Tuple[tf.Tensor, tf.Tensor]:
     """input_fn for tf.estimator.Estimator."""
     # pylint: disable=invalid-name
     X_train, y_train, X_valid, y_valid, X_test, y_test = load_data(dataset_dir)
@@ -204,23 +207,18 @@ def make_estimator_input_fn(dataset_dir: Text, ds: DatasetSplit):
     # TPUs don't play well with tf.int64.
     target_op = target_op.astype(np.int32)
 
-    batch_size = params['batch_size']
-
     dataset = iterate_minibatches_dataset(
         inputs=input_op,
         targets=target_op,
-        batch_size=batch_size,
+        batch_size=params.batch_size,
         shuffle=ds is DatasetSplit.TRAIN,
         augment=ds is DatasetSplit.TRAIN)
 
     input_op, target_op = dataset.prefetch(
         _PREFETCH_NUM_BATCHES).make_one_shot_iterator().get_next()
 
-    logging.info('batch_size: %r', batch_size)
-    logging.info('input_op dtype: %r', input_op.dtype)
-    logging.info('input_op shape: %r', input_op.shape)
-    logging.info('target_op dtype: %r', target_op.dtype)
-    logging.info('target_op shape: %r', target_op.shape)
+    logging.info('input_fn output input_op: %r', input_op)
+    logging.info('input_fn output target_op: %r', target_op)
 
     return input_op, target_op
 

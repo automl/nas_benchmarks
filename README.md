@@ -13,7 +13,7 @@ To train a WRN on CIFAR-10:
       --data_dir ${PATH_TO_DATASET}/cifar-10-batches-py/ \
       --train_dir ${OUTPUT_DIR} \
       --num_epochs 20 \
-      --lr_decay cosine \
+      --lr_decay COSINE \
       --initial_lr 0.1 \
       --nodepthwise \
       --num_residual_units_1 4 \
@@ -34,6 +34,5 @@ in `${OUTPUT_DIR}`.
 
 TODOs:
 
-1. Move all code to use `tf.estimator.Estimator` and delete the old code path.
-1. Add timestamps to the checkpoints. This should be possible by creating a
-variable and using `tf.timestamp` to set it each time the train op is called.
+1.  Move all code to use `tf.estimator.Estimator` and delete the old code path.
+1.  Make the checkpoints smaller. They're around 250 MB each currently.
