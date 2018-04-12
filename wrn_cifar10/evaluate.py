@@ -5,6 +5,8 @@ import tensorflow as tf
 
 from wrn_cifar10 import data  # pylint: disable=g-bad-import-order
 from wrn_cifar10 import model # pylint: disable=g-bad-import-order
+from wrn_cifar10 import controller # pylint: disable=g-bad-import-order
+
 
 app = tf.app
 logging = tf.logging
@@ -148,7 +150,7 @@ def evaluate():
 
         n_params = np.sum([np.prod(v.shape) for v in tf.trainable_variables()])
         results["number_of_parameters"] = int(n_params.value)
-        results["configuration"] = hp._asdict()
+        results["configuration"] = controller.hparams_to_json(hp)
         # results["runtime_train_epochs"] = runtime_train_epochs
         # results["runtime_test_epochs"] = runtime_test_epochs
         # results["runtime_valid_epochs"] = runtime_valid_epochs
