@@ -145,8 +145,8 @@ FIRST = [
     ('optimizer', ParameterType.CATEGORICAL, [model.Optimizer.MOMENTUM]),
     ('initial_lr', ParameterType.DISCRETE, [0.05, 0.1]),
     ('lr_decay', ParameterType.CATEGORICAL, [model.LRDecaySchedule.COSINE]),
-    ('weight_decay', ParameterType.DISCRETE, [0.0005, 0.001]),
-    ('momentum', ParameterType.DISCRETE, [0.6, 0.9]),
+    ('weight_decay', ParameterType.DISCRETE, [0.0005]),
+    ('momentum', ParameterType.DISCRETE, [0.9]),
     ('use_nesterov', ParameterType.BOOLEAN, [False]),
 
     # Architecture.
