@@ -102,6 +102,8 @@ flags.DEFINE_integer('iterations_per_loop', 1 << 6,
 flags.DEFINE_bool(
     'save_disk_space', False,
     'Whether to omit some state files to reduce disk space usage.')
+flags.DEFINE_bool('use_model_parallelism', True,
+                  'Whether to use model parallelism.')
 flags.DEFINE_integer('replicate', 0, 'The index of the replicate.')
 
 # More flags in shared_flags.py.
@@ -613,7 +615,8 @@ def main(argv):
         hp=make_hparams_from_flags(),
         master=FLAGS.master,
         iterations_per_loop=FLAGS.iterations_per_loop,
-        save_disk_space=FLAGS.save_disk_space)
+        save_disk_space=FLAGS.save_disk_space,
+        use_model_parallelism=FLAGS.use_model_parallelism)
   else:
     train()
 

@@ -12,18 +12,15 @@ import enum
 import numpy as np
 import tensorflow as tf
 
-from typing import Any, Dict, Generator, Text, Tuple
+from typing import Any, Dict, Generator, Text, Tuple, Union
 
 logging = tf.logging
 gfile = tf.gfile
 
 IMAGE_SIZE = 32
 
-# The size of the shuffle buffer.
-_SHUFFLE_BUFFER_SIZE = 1 << 14
-
 # The number of batches to prefetch at the end of the tf.data pipeline.
-_PREFETCH_NUM_BATCHES = 1 << 6
+_PREFETCH_NUM_BATCHES = 1 << 4
 
 
 def is_python_3() -> bool:
@@ -111,13 +108,15 @@ def iterate_minibatches_dataset(
     augment: bool = False,
 ) -> tf.data.Dataset:
   """Optionally augment, shuffle, and batch the provided data."""
+  if shuffle:
+    permutation = np.random.permutation(range(len(inputs)))
+    inputs = inputs[permutation, ...]
+    targets = targets[permutation]
+
   dataset = tf.data.Dataset.from_tensor_slices((inputs, targets)).repeat()
 
   if augment:
     dataset = dataset.map(augment_data, num_parallel_calls=16)
-
-  if shuffle:
-    dataset = dataset.shuffle(_SHUFFLE_BUFFER_SIZE)
 
   return dataset.apply(tf.contrib.data.batch_and_drop_remainder(batch_size))
 
@@ -142,10 +141,6 @@ def iterate_minibatches(
       dimension.
     batch_size: The size of the sampled minibatches.
     shuffle: Whether to shuffle the data.
-      NOTE, unlike Aaron's original code, if shuffle is True this is NOT
-      guaranteed to sample every example exactly once, as shuffling is done
-      via a shuffling pool.
-      TODO(ericmc), consider fixing this.
     augment: Whether to augment the data.
 
   Yields:
@@ -173,19 +168,26 @@ class DatasetSplit(enum.Enum):
   TEST = 'TEST'
 
 
-def make_estimator_input_fn(dataset_dir: Text, ds: DatasetSplit):
+def make_estimator_input_fn(dataset_dir: Text, ds: DatasetSplit,
+                            return_dataset: bool):
   """Creates an input_fn for tf.estimator.Estimator.
 
   Args:
     dataset_dir: The location of the CIFAR-10 dataset.
     ds: DatasetSplit
+    return_dataset: Whether the created function should return a Dataset, as
+      opposed to Tensors.
+      Used if running on TPUs with `per_host_input_for_training=
+        tf.contrib.tpu.InputPipelineConfig.PER_HOST_V2`.
+      NOTE(ericmc), it's unlikely we'll use this option, so consider removing
+        it.
 
   Returns:
     An input function.
   """
 
-  def input_fn(
-      params: tf.contrib.training.HParams) -> Tuple[tf.Tensor, tf.Tensor]:
+  def input_fn(params: tf.contrib.training.HParams
+              ) -> Union[Tuple[tf.Tensor, tf.Tensor], tf.data.Dataset]:
     """input_fn for tf.estimator.Estimator."""
     # pylint: disable=invalid-name
     X_train, y_train, X_valid, y_valid, X_test, y_test = load_data(dataset_dir)
@@ -214,12 +216,16 @@ def make_estimator_input_fn(dataset_dir: Text, ds: DatasetSplit):
         shuffle=ds is DatasetSplit.TRAIN,
         augment=ds is DatasetSplit.TRAIN)
 
-    input_op, target_op = dataset.prefetch(
-        _PREFETCH_NUM_BATCHES).make_one_shot_iterator().get_next()
+    dataset = dataset.prefetch(_PREFETCH_NUM_BATCHES)
 
-    logging.info('input_fn output input_op: %r', input_op)
-    logging.info('input_fn output target_op: %r', target_op)
+    if return_dataset:
+      return dataset
+    else:
+      input_op, target_op = dataset.make_one_shot_iterator().get_next()
 
-    return input_op, target_op
+      logging.info('input_fn output input_op: %r', input_op)
+      logging.info('input_fn output target_op: %r', target_op)
+
+      return input_op, target_op
 
   return input_fn
