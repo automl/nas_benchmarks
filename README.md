@@ -36,3 +36,4 @@ TODOs:
 
 1.  Move all code to use `tf.estimator.Estimator` and delete the old code path.
 1.  Make the checkpoints smaller. They're around 250 MB each currently.
+1.  Add a Beam script for parallel evaluation of the checkpoints.

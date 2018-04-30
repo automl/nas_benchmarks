@@ -486,16 +486,26 @@ def make_estimator_model_fn(
 
     loss_op = network.loss
     train_op = network.train_op
+    accuracy_op = network.acc
 
     if make_tpu_estimator_spec:
+
+      def metric_fn(accuracy_op: tf.Tensor):
+        return {
+            'accuracy': tf.metrics.mean(accuracy_op),
+        }
+
       return tf.contrib.tpu.TPUEstimatorSpec(
-          mode=mode, loss=loss_op, train_op=train_op)
+          mode=mode,
+          loss=loss_op,
+          train_op=train_op,
+          eval_metrics=(metric_fn, [tf.reshape(accuracy_op, [1])]))
     else:
       return tf.estimator.EstimatorSpec(
           mode=mode,
           predictions={},
           loss=loss_op,
           train_op=train_op,
-          eval_metric_ops={})
+          eval_metric_ops={'accuracy': tf.metrics.mean(accuracy_op)})
 
   return model_fn
