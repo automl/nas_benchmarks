@@ -106,7 +106,6 @@ flags.DEFINE_bool('use_model_parallelism', True,
                   'Whether to use model parallelism.')
 flags.DEFINE_integer('replicate', 0, 'The index of the replicate.')
 
-# More flags in shared_flags.py.
 FLAGS = flags.FLAGS
 
 
