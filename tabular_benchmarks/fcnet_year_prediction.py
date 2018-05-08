@@ -90,10 +90,10 @@ class FCNetYearPredictionBenchmark(object):
                 inc_valid = self.y[i]
                 inc_test, _ = self.objective_function_test(self.X[i])
 
-            regret_validation.append(inc_valid - y_star_valid)
-            regret_test.append(inc_test - y_star_test)
+            regret_validation.append(float(inc_valid - y_star_valid))
+            regret_test.append(float(inc_test - y_star_test))
             rt += self.c[i]
-            runtime.append(rt)
+            runtime.append(float(rt))
 
         res = dict()
         res['regret_validation'] = regret_validation
