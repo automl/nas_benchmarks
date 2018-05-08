@@ -62,7 +62,10 @@ class FCNetYearPredictionBenchmark(object):
 
     def objective_function_test(self, config, **kwargs):
         i = self.rng.randint(4)
-        k = json.dumps(config, sort_keys=True)
+        if type(config) == ConfigSpace.Configuration:
+            k = json.dumps(config.get_dictionary(), sort_keys=True)
+        else:
+            k = json.dumps(config, sort_keys=True)
 
         test = self.data[k]["final_test_error"][i]
         runtime = self.data[k]["runtime"][i]
