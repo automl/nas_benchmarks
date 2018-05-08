@@ -1,26 +1,24 @@
 import os
 import json
+import h5py
 import numpy as np
 import ConfigSpace
 
 
 class FCNetYearPredictionBenchmark(object):
 
-    def __init__(self, data_dir="./"):
+    def __init__(self, data_dir="./", seed=None):
 
         cs = self.get_configuration_space()
         self.names = [h.name for h in cs.get_hyperparameters()]
 
-        dic = json.load(open(os.path.join(data_dir, "fcnet_year_prediction_data.json"), "r"))
-
-        k = dic.keys()
-        v = dic.values()
-        k1 = [eval(i) for i in k]
-        self.data = dict(zip(*[k1, v]))
+        self.data = h5py.File(os.path.join(data_dir, "fcnet_year_prediction_data.hdf5"), "r")
 
         self.X = []
         self.y = []
         self.c = []
+
+        self.rng = np.random.RandomState(seed)
 
     def get_best_configuration(self):
 
@@ -30,27 +28,27 @@ class FCNetYearPredictionBenchmark(object):
         :return: Returns tuple with the best configuration, its final validation performance and its test performance
         """
 
-        best = None
-        curr_valid = np.inf
-        curr_test = np.inf
+        configs, te, ve = [], [], []
         for k in self.data.keys():
-            if self.data[k][1] < curr_test:
-                curr_valid = self.data[k][0][-1]
-                curr_test = self.data[k][1]
-                best = k
+            configs.append(json.loads(k))
+            te.append(np.mean(self.data[k]["final_test_error"]))
+            ve.append(np.mean(self.data[k]["valid_mae"][:, -1]))
 
-        best_config = dict()
-        for i, n in enumerate(self.names):
-            best_config[n] = best[i]
+        b = np.argmin(te)
 
-        return best_config, curr_valid, curr_test
+        return configs[b], ve[b], te[b]
 
     def objective_function(self, config, budget=100, **kwargs):
-        c = []
-        for h in self.names:
-            c.append(config[h])
 
-        valid, test, runtime = self.data[tuple(c)]
+        i = self.rng.randint(4)
+
+        if type(config) == ConfigSpace.Configuration:
+            k = json.dumps(config.get_dictionary(), sort_keys=True)
+        else:
+            k = json.dumps(config, sort_keys=True)
+
+        valid = self.data[k]["valid_mae"][i]
+        runtime = self.data[k]["runtime"][i]
 
         time_per_epoch = runtime / 100
 
@@ -63,11 +61,11 @@ class FCNetYearPredictionBenchmark(object):
         return valid[budget - 1], rt
 
     def objective_function_test(self, config, **kwargs):
-        c = []
-        for h in self.names:
-            c.append(config[h])
+        i = self.rng.randint(4)
+        k = json.dumps(config, sort_keys=True)
 
-        valid, test, runtime = self.data[tuple(c)]
+        test = self.data[k]["final_test_error"][i]
+        runtime = self.data[k]["runtime"][i]
 
         return test, runtime
 
@@ -105,21 +103,14 @@ class FCNetYearPredictionBenchmark(object):
     def get_configuration_space():
         cs = ConfigSpace.ConfigurationSpace()
 
+        cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("n_units_1", [16, 32, 64, 128, 256, 512]))
+        cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("n_units_2", [16, 32, 64, 128, 256, 512]))
+        cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("dropout_1", [0.0, 0.3, 0.6]))
+        cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("dropout_2", [0.0, 0.3, 0.6]))
+        cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("activation_fn_1", ["tanh", "relu"]))
+        cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("activation_fn_2", ["tanh", "relu"]))
         cs.add_hyperparameter(
-            ConfigSpace.OrdinalHyperparameter("n_units_1", [16, 32, 64, 128, 256, 512], default_value=64))
-        cs.add_hyperparameter(
-            ConfigSpace.OrdinalHyperparameter("n_units_2", [16, 32, 64, 128, 256, 512], default_value=64))
-        cs.add_hyperparameter(ConfigSpace.OrdinalHyperparameter("dropout_1", [0.0, 0.3, 0.6], default_value=0.0))
-        cs.add_hyperparameter(ConfigSpace.OrdinalHyperparameter("dropout_2", [0.0, 0.3, 0.6], default_value=0.0))
-        cs.add_hyperparameter(
-            ConfigSpace.CategoricalHyperparameter("activation_fn_1", ["tanh", "relu"], default_value='relu'))
-        cs.add_hyperparameter(
-            ConfigSpace.CategoricalHyperparameter("activation_fn_2", ["tanh", "relu"], default_value='relu'))
-        cs.add_hyperparameter(
-            ConfigSpace.OrdinalHyperparameter("init_lr", [5 * 1e-4, 1e-3, 5 * 1e-3, 1e-2, 5 * 1e-2, 1e-1],
-                                              default_value=1e-3))
-        cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("lr_schedule", ["cosine", "const", "exponential"],
-                                                                    default_value='const'))
-        cs.add_hyperparameter(
-            ConfigSpace.OrdinalHyperparameter("batch_size", [8, 16, 32, 64, 128], default_value=32))
+            ConfigSpace.CategoricalHyperparameter("init_lr", [5 * 1e-4, 1e-3, 5 * 1e-3, 1e-2, 5 * 1e-2, 1e-1]))
+        cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("lr_schedule", ["cosine", "const"]))
+        cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("batch_size", [8, 16, 32, 64]))
         return cs
