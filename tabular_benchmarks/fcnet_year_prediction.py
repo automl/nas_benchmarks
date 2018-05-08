@@ -118,8 +118,15 @@ class FCNetYearPredictionBenchmark(object):
         cs.add_hyperparameter(
             ConfigSpace.OrdinalHyperparameter("init_lr", [5 * 1e-4, 1e-3, 5 * 1e-3, 1e-2, 5 * 1e-2, 1e-1],
                                               default_value=1e-3))
-        cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("lr_schedule", ["cosine", "const", "exponential"],
+
+#        cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("lr_schedule", ["cosine", "const", "exponential"],
+#                                                                    default_value='const'))
+        cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("lr_schedule", ["cosine", "const"],
                                                                     default_value='const'))
+
+#        cs.add_hyperparameter(
+#            ConfigSpace.OrdinalHyperparameter("batch_size", [8, 16, 32, 64, 128], default_value=32))
         cs.add_hyperparameter(
-            ConfigSpace.OrdinalHyperparameter("batch_size", [8, 16, 32, 64, 128], default_value=32))
+            ConfigSpace.OrdinalHyperparameter("batch_size", [8, 16, 32, 64], default_value=32))
+
         return cs
