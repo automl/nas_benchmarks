@@ -168,13 +168,20 @@ class DatasetSplit(enum.Enum):
   TEST = 'TEST'
 
 
+class EstimatorMode(enum.Enum):
+  """What the Estimator will do."""
+  TRAIN = 'TRAIN'
+  EVAL = 'EVAL'
+
+
 def make_estimator_input_fn(dataset_dir: Text, ds: DatasetSplit,
-                            return_dataset: bool):
+                            em: EstimatorMode, return_dataset: bool):
   """Creates an input_fn for tf.estimator.Estimator.
 
   Args:
     dataset_dir: The location of the CIFAR-10 dataset.
     ds: DatasetSplit
+    em: EstimatorMode
     return_dataset: Whether the created function should return a Dataset, as
       opposed to Tensors.
       Used if running on TPUs with `per_host_input_for_training=
@@ -213,8 +220,8 @@ def make_estimator_input_fn(dataset_dir: Text, ds: DatasetSplit,
         inputs=input_op,
         targets=target_op,
         batch_size=params.batch_size,
-        shuffle=ds is DatasetSplit.TRAIN,
-        augment=ds is DatasetSplit.TRAIN)
+        shuffle=em is EstimatorMode.TRAIN,
+        augment=em is EstimatorMode.TRAIN)
 
     dataset = dataset.prefetch(_PREFETCH_NUM_BATCHES)
 

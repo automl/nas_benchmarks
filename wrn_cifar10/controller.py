@@ -20,6 +20,7 @@ gfile = tf.gfile
 
 NUM_TRAIN_EXAMPLES = 45000
 NUM_EVAL_EXAMPLES = 5000
+NUM_TEST_EXAMPLES = 10000
 
 # These should:
 # 1) Be large enough to be efficient.
@@ -29,8 +30,12 @@ EVAL_BATCH_SIZE = 50
 EVAL_ITERATIONS_PER_LOOP = 100
 
 
-def _hparams_path(train_dir: Text) -> Text:
+def get_hparams_path(train_dir: Text) -> Text:
   return os.path.join(train_dir, 'hparams.json')
+
+
+def get_train_metadata_path(train_dir: Text) -> Text:
+  return os.path.join(train_dir, 'train_metadata.json')
 
 
 def hparams_to_json(hp: tf.contrib.training.HParams) -> Text:
@@ -207,7 +212,7 @@ def train_estimator(
     master: URL of the Cloud TPU instance.
     iterations_per_loop: Number of iterations per TPU training loop.
     save_disk_space: If true, non-essential logs are not saved to disk.
-    use_model_parallelism: Whether to use model parallelism.
+    use_model_parallelism: Whether to use model parallelism on TPUs.
       This will make batch norm behave as it does on CPUs and GPUs, and provide
       twice the memory for each model.
       However, it will likely halve TPU efficiency.
@@ -215,7 +220,7 @@ def train_estimator(
   batch_size = hp.batch_size
 
   logging.info('HParams: %r', hp)
-  hparams_path = _hparams_path(train_dir)
+  hparams_path = get_hparams_path(train_dir)
   logging.info('Writing HParams to %s', hparams_path)
   with gfile.Open(hparams_path, 'w') as fh:
     fh.write(hparams_to_json(hp))
@@ -236,12 +241,12 @@ def train_estimator(
   estimator.train(
       input_fn=data.make_estimator_input_fn(
           dataset_dir=data_dir,
+          em=data.EstimatorMode.TRAIN,
           ds=data.DatasetSplit.TRAIN,
           return_dataset=False),
-      steps=num_train_steps)
+      max_steps=num_train_steps)
 
   stop_time = time.time()
-
   duration = stop_time - start_time
   metadata = {
       'start_time': start_time,
@@ -250,7 +255,7 @@ def train_estimator(
       'examples_per_second': NUM_TRAIN_EXAMPLES * hp.num_epochs / duration,
   }
   logging.info('Train metadata: %r', metadata)
-  metadata_path = os.path.join(train_dir, 'train_metadata.json')
+  metadata_path = get_train_metadata_path(train_dir)
   logging.info('Writing train metadata to %s', metadata_path)
   with gfile.Open(metadata_path, 'w') as fh:
     json.dump(metadata, fh, indent=2, sort_keys=True)
@@ -268,6 +273,8 @@ def evaluate_estimator(
     master: Text,
     save_disk_space: bool,
     checkpoint_path: Text = None,
+    hparams_path: Text = None,
+    metadata_path: Text = None,
 ) -> Dict[Text, Any]:
   """Evaluates the model.
 
@@ -282,13 +289,17 @@ def evaluate_estimator(
     save_disk_space: If true, non-essential logs are not saved to disk.
     checkpoint_path: If provided, evaluate the given checkpoint.
       Else use the latest one.
+    hparams_path: Path to the HParams as a JSON file.
+      If not provided, reads from a default location.
+    metadata_path: Where to write the metadata.
+      If not provided, writes to a default location.
 
   Returns:
     Metrics.
   """
   logging.info('Evaluating on %s set', ds.name)
 
-  hparams_path = _hparams_path(train_dir)
+  hparams_path = hparams_path if hparams_path else get_hparams_path(train_dir)
   logging.info('Reading HParams from %s', hparams_path)
   with gfile.Open(hparams_path, 'r') as fh:
     s = fh.read()
@@ -307,13 +318,17 @@ def evaluate_estimator(
   num_examples = {
       data.DatasetSplit.TRAIN: NUM_TRAIN_EXAMPLES,
       data.DatasetSplit.EVAL: NUM_EVAL_EXAMPLES,
+      data.DatasetSplit.TEST: NUM_TEST_EXAMPLES,
   }[ds]
   batch_size = EVAL_BATCH_SIZE
 
   start_time = time.time()
   metrics = estimator.evaluate(
       input_fn=data.make_estimator_input_fn(
-          dataset_dir=data_dir, ds=ds, return_dataset=False),
+          dataset_dir=data_dir,
+          em=data.EstimatorMode.EVAL,
+          ds=ds,
+          return_dataset=False),
       steps=num_examples // batch_size,
       checkpoint_path=checkpoint_path,
       name=None)
@@ -329,7 +344,8 @@ def evaluate_estimator(
       'examples_per_second': num_examples / duration,
   }
   logging.info('Eval on %s metadata: %r', ds.name, metadata)
-  metadata_path = os.path.join(train_dir, 'eval_on_%s_metadata.json' % ds.name)
+  metadata_path = metadata_path if metadata_path else os.path.join(
+      train_dir, 'eval_on_%s_metadata.json' % ds.name)
   logging.info('Writing eval metadata to %s', metadata_path)
   with gfile.Open(metadata_path, 'w') as fh:
     json.dump(metadata, fh, indent=2, sort_keys=True)
