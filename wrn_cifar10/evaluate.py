@@ -162,7 +162,8 @@ def evaluate():
 
         results["flops"] = flops.total_float_ops
 
-        fh = open(os.path.join(FLAGS.save_dir, "results.json"), "w")
+        os.makedirs(os.path.join(FLAGS.save_dir), exist_ok=True)
+        fh = open(os.path.join(FLAGS.save_dir, "results_%d.json" % epoch), "w")
         json.dump(results, fh)
         fh.close()
 
