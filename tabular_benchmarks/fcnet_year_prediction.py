@@ -106,14 +106,14 @@ class FCNetYearPredictionBenchmark(object):
     def get_configuration_space():
         cs = ConfigSpace.ConfigurationSpace()
 
-        cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("n_units_1", [16, 32, 64, 128, 256, 512]))
-        cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("n_units_2", [16, 32, 64, 128, 256, 512]))
-        cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("dropout_1", [0.0, 0.3, 0.6]))
-        cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("dropout_2", [0.0, 0.3, 0.6]))
+        cs.add_hyperparameter(ConfigSpace.OrdinalHyperparameter("n_units_1", [16, 32, 64, 128, 256, 512]))
+        cs.add_hyperparameter(ConfigSpace.OrdinalHyperparameter("n_units_2", [16, 32, 64, 128, 256, 512]))
+        cs.add_hyperparameter(ConfigSpace.OrdinalHyperparameter("dropout_1", [0.0, 0.3, 0.6]))
+        cs.add_hyperparameter(ConfigSpace.OrdinalHyperparameter("dropout_2", [0.0, 0.3, 0.6]))
         cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("activation_fn_1", ["tanh", "relu"]))
         cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("activation_fn_2", ["tanh", "relu"]))
         cs.add_hyperparameter(
-            ConfigSpace.CategoricalHyperparameter("init_lr", [5 * 1e-4, 1e-3, 5 * 1e-3, 1e-2, 5 * 1e-2, 1e-1]))
+            ConfigSpace.OrdinalHyperparameter("init_lr", [5 * 1e-4, 1e-3, 5 * 1e-3, 1e-2, 5 * 1e-2, 1e-1]))
         cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("lr_schedule", ["cosine", "const"]))
-        cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("batch_size", [8, 16, 32, 64]))
+        cs.add_hyperparameter(ConfigSpace.OrdinalHyperparameter("batch_size", [8, 16, 32, 64]))
         return cs
