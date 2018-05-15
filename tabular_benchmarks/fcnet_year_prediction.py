@@ -55,8 +55,8 @@ class FCNetYearPredictionBenchmark(object):
         rt = time_per_epoch * budget
 
         self.X.append(config)
-        self.y.append(valid[budget - 1])
-        self.c.append(rt)
+        self.y.append(np.mean(self.data[k]["valid_mae"][:, budget - 1]))
+        self.c.append(np.mean(self.data[k]["runtime"]))
 
         return valid[budget - 1], rt
 
