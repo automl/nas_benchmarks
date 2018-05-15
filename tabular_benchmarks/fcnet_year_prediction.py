@@ -60,6 +60,29 @@ class FCNetYearPredictionBenchmark(object):
 
         return valid[budget - 1], rt
 
+
+
+    def objective_function_deterministic(self, config, budget=100, index=0, **kwargs):
+
+        if type(config) == ConfigSpace.Configuration:
+            k = json.dumps(config.get_dictionary(), sort_keys=True)
+        else:
+            k = json.dumps(config, sort_keys=True)
+
+        valid = self.data[k]["valid_mae"][index]
+        runtime = self.data[k]["runtime"][index]
+
+        time_per_epoch = runtime / 100
+
+        rt = time_per_epoch * budget
+
+        self.X.append(config)
+        self.y.append(valid[budget - 1])
+        self.c.append(rt)
+
+        return valid[budget - 1], rt
+
+
     def objective_function_test(self, config, **kwargs):
 
         if type(config) == ConfigSpace.Configuration:
