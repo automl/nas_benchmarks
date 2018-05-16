@@ -56,7 +56,7 @@ class FCNetYearPredictionBenchmark(object):
 
         self.X.append(config)
         self.y.append(np.mean(self.data[k]["valid_mae"][:, budget - 1]))
-        self.c.append(np.mean(self.data[k]["runtime"]))
+        self.c.append(np.mean(self.data[k]["runtime"]) / 100 * budget)
 
         return valid[budget - 1], rt
 
