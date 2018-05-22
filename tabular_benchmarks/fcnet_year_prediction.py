@@ -60,7 +60,27 @@ class FCNetYearPredictionBenchmark(object):
 
         return valid[budget - 1], rt
 
+    def objective_function_learning_curve(self, config, budget=100):
 
+        index = self.rng.randint(4)
+
+        if type(config) == ConfigSpace.Configuration:
+            k = json.dumps(config.get_dictionary(), sort_keys=True)
+        else:
+            k = json.dumps(config, sort_keys=True)
+
+        lc = [self.data[k]["valid_mae"][index][i] for i in range(budget)]
+        runtime = self.data[k]["runtime"][index]
+
+        time_per_epoch = runtime / 100
+
+        rt = [time_per_epoch * (i+1) for i in range(budget)]
+
+        self.X.append(config)
+        self.y.append(lc[-1])
+        self.c.append(rt[-1])
+
+        return lc, rt
 
     def objective_function_deterministic(self, config, budget=100, index=0, **kwargs):
 
@@ -81,7 +101,6 @@ class FCNetYearPredictionBenchmark(object):
         self.c.append(rt)
 
         return valid[budget - 1], rt
-
 
     def objective_function_test(self, config, **kwargs):
 
