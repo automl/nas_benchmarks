@@ -27,6 +27,9 @@ elif args.benchmark == "fcnet_regression":
 elif args.benchmark == "protein_structure":
     b = FCNetBenchmark(dataset=args.data_dir)
 
+elif args.benchmark == "slice_localization":
+    b = FCNetBenchmark(dataset=args.data_dir)
+
 output_path = args.output_path
 os.makedirs(os.path.join(output_path), exist_ok=True)
 
