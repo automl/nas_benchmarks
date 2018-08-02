@@ -16,7 +16,7 @@ parser.add_argument('--output_path', default="./", type=str, nargs='?',
                     help='specifies the path where the results will be saved')
 parser.add_argument('--data_dir', default="./", type=str, nargs='?', help='specifies the path to the tabular data')
 
-args = vars(parser.parse_args())
+args = parser.parse_args()
 
 if args.benchmark == "wrn_cifar10":
     b = WRNCIFAR103HBenchmark(data_dir=args.data_dir)
@@ -30,7 +30,7 @@ elif args.benchmark == "protein_structure":
 elif args.benchmark == "slice_localization":
     b = FCNetBenchmark(dataset=args.data_dir)
 
-output_path = args.output_path
+output_path = os.path.join(args.output_path, "random_search")
 os.makedirs(os.path.join(output_path), exist_ok=True)
 
 cs = b.get_configuration_space()

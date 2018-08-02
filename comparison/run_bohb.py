@@ -6,7 +6,7 @@ import argparse
 import logging
 logging.basicConfig(level=logging.ERROR)
 
-from hpbandster.optimizers.hyperband import HyperBand
+from hpbandster.optimizers.bohb import BOHB
 import hpbandster.core.nameserver as hpns
 from hpbandster.core.worker import Worker
 
@@ -43,7 +43,7 @@ elif args.benchmark == "slice_localization":
     min_budget = 4
     max_budget = 100
 
-output_path = os.path.join(args.output_path, "hyperband")
+output_path = os.path.join(args.output_path, "bohb")
 os.makedirs(os.path.join(output_path), exist_ok=True)
 
 cs = b.get_configuration_space()
@@ -73,16 +73,16 @@ for i in range(num_workers):
     w.run(background=True)
     workers.append(w)
 
-HB = HyperBand(configspace=cs,
+bohb = BOHB(configspace=cs,
                run_id=hb_run_id,
                eta=3, min_budget=min_budget, max_budget=max_budget,
                nameserver=ns_host,
                nameserver_port=ns_port,
                ping_interval=10)
 
-results = HB.run(args.n_iters, min_n_workers=num_workers)
+results = bohb.run(args.n_iters, min_n_workers=num_workers)
 
-HB.shutdown(shutdown_workers=True)
+bohb.shutdown(shutdown_workers=True)
 NS.shutdown()
 
 res = b.get_results()
