@@ -2,9 +2,9 @@ import os
 import json
 import argparse
 
-from wrn_cifar10_3h import WRNCIFAR103HBenchmark
-from fcnet_year_prediction import FCNetYearPredictionBenchmark
-from fcnet_benchmark import FCNetBenchmark
+from tabular_benchmarks.wrn_cifar10_3h import WRNCIFAR103HBenchmark
+from tabular_benchmarks.fcnet_year_prediction import FCNetYearPredictionBenchmark
+from tabular_benchmarks.fcnet_benchmark import FCNetBenchmark
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--run_id', default=0, type=int, nargs='?', help='unique number to identify this run')

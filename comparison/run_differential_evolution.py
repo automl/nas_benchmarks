@@ -3,9 +3,9 @@ import json
 import argparse
 import ConfigSpace
 
-from wrn_cifar10_3h import WRNCIFAR103HBenchmark
-from fcnet_year_prediction import FCNetYearPredictionBenchmark
-from fcnet_benchmark import FCNetBenchmark
+from tabular_benchmarks.wrn_cifar10_3h import WRNCIFAR103HBenchmark
+from tabular_benchmarks.fcnet_year_prediction import FCNetYearPredictionBenchmark
+from tabular_benchmarks.fcnet_benchmark import FCNetBenchmark
 
 from scipy.optimize import differential_evolution
 

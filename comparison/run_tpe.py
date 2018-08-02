@@ -6,9 +6,9 @@ import argparse
 
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 
-from wrn_cifar10_3h import WRNCIFAR103HBenchmark
-from fcnet_year_prediction import FCNetYearPredictionBenchmark
-from fcnet_benchmark import FCNetBenchmark
+from tabular_benchmarks.wrn_cifar10_3h import WRNCIFAR103HBenchmark
+from tabular_benchmarks.fcnet_year_prediction import FCNetYearPredictionBenchmark
+from tabular_benchmarks.fcnet_benchmark import FCNetBenchmark
 
 
 parser = argparse.ArgumentParser()
