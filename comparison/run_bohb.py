@@ -1,17 +1,15 @@
 import os
-import sys
 import ConfigSpace
 import json
 import argparse
 import logging
+
 logging.basicConfig(level=logging.ERROR)
 
 from hpbandster.optimizers.bohb import BOHB
 import hpbandster.core.nameserver as hpns
 from hpbandster.core.worker import Worker
 
-sys.path.append("/home/kleinaa/devel/git/nas_benchmark_github/tabular_benchmarks")
-from wrn_cifar10 import WRNCIFAR10Benchmark
 from fcnet_year_prediction import FCNetYearPredictionBenchmark
 from fcnet_benchmark import FCNetBenchmark
 
@@ -74,11 +72,11 @@ for i in range(num_workers):
     workers.append(w)
 
 bohb = BOHB(configspace=cs,
-               run_id=hb_run_id,
-               eta=3, min_budget=min_budget, max_budget=max_budget,
-               nameserver=ns_host,
-               nameserver_port=ns_port,
-               ping_interval=10)
+            run_id=hb_run_id,
+            eta=3, min_budget=min_budget, max_budget=max_budget,
+            nameserver=ns_host,
+            nameserver_port=ns_port,
+            ping_interval=10)
 
 results = bohb.run(args.n_iters, min_n_workers=num_workers)
 

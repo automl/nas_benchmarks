@@ -1,5 +1,4 @@
 import os
-import sys
 import ConfigSpace
 import json
 import argparse
@@ -10,8 +9,6 @@ from hpbandster.optimizers.hyperband import HyperBand
 import hpbandster.core.nameserver as hpns
 from hpbandster.core.worker import Worker
 
-sys.path.append("/home/kleinaa/devel/git/nas_benchmark_github/tabular_benchmarks")
-from wrn_cifar10 import WRNCIFAR10Benchmark
 from fcnet_year_prediction import FCNetYearPredictionBenchmark
 from fcnet_benchmark import FCNetBenchmark
 

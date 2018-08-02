@@ -1,5 +1,4 @@
 import os
-import sys
 from copy import deepcopy
 import json
 import ConfigSpace
@@ -7,7 +6,6 @@ import argparse
 
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 
-sys.path.append("/home/kleinaa/devel/git/nas_benchmark_github/tabular_benchmarks")
 from wrn_cifar10_3h import WRNCIFAR103HBenchmark
 from fcnet_year_prediction import FCNetYearPredictionBenchmark
 from fcnet_benchmark import FCNetBenchmark

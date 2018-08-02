@@ -1,12 +1,11 @@
 import os
-import sys
 import json
 import argparse
 
 from smac.facade.smac_facade import SMAC
 from smac.scenario.scenario import Scenario
 from smac.tae.execute_func import ExecuteTAFuncDict
-sys.path.append("/home/kleinaa/devel/git/nas_benchmark_github/tabular_benchmarks")
+
 from wrn_cifar10_3h import WRNCIFAR103HBenchmark
 from fcnet_year_prediction import FCNetYearPredictionBenchmark
 from fcnet_benchmark import FCNetBenchmark
