@@ -1,5 +1,4 @@
 import os
-import sys
 import json
 import argparse
 import numpy as np
@@ -51,7 +50,7 @@ def obj_wrapper(x):
 
     y, c = b.objective_function(config)
 
-    return y
+    return np.float(y)
 
 
 lower = []
