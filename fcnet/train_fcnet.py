@@ -13,34 +13,35 @@ from keras.callbacks import LearningRateScheduler
 import keras.backend as K
 
 
-def get_data(path):
-    X = np.array(np.load(os.path.join(path, "year_prediction_train_data.npy")), dtype=np.float32)
-    y = np.array(np.load(os.path.join(path, "year_prediction_train_targets.npy")), dtype=np.float32)
+def get_data(path, dataset="protein_structure"):
+    train = np.array(np.load(os.path.join(path, "%s_train_data.npy" % dataset)), dtype=np.float32)
+    train_targets = np.array(np.load(os.path.join(path, "%s_train_targets.npy" % dataset)), dtype=np.float32)
 
-    test = np.array(np.load(os.path.join(path, "year_prediction_test_data.npy")), dtype=np.float32)
-    test_targets = np.array(np.load(os.path.join(path, "year_prediction_test_targets.npy")), dtype=np.float32)
+    valid = np.array(np.load(os.path.join(path, "%s_valid_data.npy" % dataset)), dtype=np.float32)
+    valid_targets = np.array(np.load(os.path.join(path, "%s_valid_targets.npy" % dataset)), dtype=np.float32)
 
-    # Split in training / validation (70 / 30 split)
-
-    n_train = int(X.shape[0] * 0.7)
-    train = X[:n_train]
-    train_targets = y[:n_train]
+    test = np.array(np.load(os.path.join(path, "%s_test_data.npy" % dataset)), dtype=np.float32)
+    test_targets = np.array(np.load(os.path.join(path, "%s_test_targets.npy" % dataset)), dtype=np.float32)
 
     m = np.mean(train, axis=0)
     s = np.mean(train, axis=0)
-
-    valid = X[n_train:]
-    valid_targets = y[n_train:]
 
     train = (train - m) / s
     valid = (valid - m) / s
     test = (test - m) / s
 
+    m = np.mean(train_targets, axis=0)
+    s = np.mean(train_targets, axis=0)
+
+    train_targets = (train_targets - m) / s
+    valid_targets = (valid_targets - m) / s
+    test_targets = (test_targets - m) / s
+
     return train, train_targets, valid, valid_targets, test, test_targets
 
 
-def mean_absolute_err(y_true, y_pred):
-    return K.mean(K.abs(y_true - y_pred))
+def mean_squared_err(y_true, y_pred):
+    return K.mean((y_true - y_pred)**2)
 
 
 def fix(epoch, initial_lr):
@@ -59,7 +60,8 @@ def cosine(epoch, initial_lr, T_max):
 def main(args):
     """Builds, trains, and evaluates the model."""
 
-    x_train, y_train, x_valid, y_valid, x_test, y_test = get_data(path=args["data_dir"])
+    x_train, y_train, x_valid, y_valid, x_test, y_test = get_data(path=args["data_dir"],
+                                                                  dataset=args["dataset"])
 
     model = Sequential()
     model.add(Dense(args["n_units_1"], activation=args["activation_fn_1"], input_dim=x_train.shape[1]))
@@ -71,7 +73,7 @@ def main(args):
     adam = Adam(lr=args["init_lr"])
     model.compile(loss='mean_squared_error',
                   optimizer=adam,
-                  metrics=[mean_absolute_err])
+                  metrics=[mean_squared_err])
 
     if args["lr_schedule"] == "cosine":
         schedule = functools.partial(cosine, initial_lr=args["init_lr"], T_max=args["n_epochs"])
@@ -83,14 +85,16 @@ def main(args):
         schedule = functools.partial(fix, initial_lr=args["init_lr"])
 
     lrate = LearningRateScheduler(schedule)
+
     callbacks_list = [lrate]
     st = time.time()
+
     hist = model.fit(x_train, y_train,
                      epochs=args["n_epochs"],
                      batch_size=args["batch_size"],
                      validation_data=(x_valid, y_valid),
                      callbacks=callbacks_list,
-                     verbose=0)
+                     verbose=2)
 
     final_perf = model.evaluate(x_test, y_test, batch_size=args["batch_size"])[1]
 
@@ -110,8 +114,8 @@ def main(args):
     r["runtime"] = time.time() - st
     r["train_loss"] = hist.history["loss"]
     r["valid_loss"] = hist.history["val_loss"]
-    r["train_mae"] = hist.history["mean_absolute_err"]
-    r["valid_mae"] = hist.history["val_mean_absolute_err"]
+    r["train_mse"] = hist.history["mean_squared_err"]
+    r["valid_mse"] = hist.history["val_mean_squared_err"]
     r["final_test_error"] = final_perf
     r["n_params"] = int(model.count_params())
 
@@ -122,19 +126,21 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--batch_size', default=128, type=int, nargs='?', help='batch size')
-    parser.add_argument('--n_units_1', default=16, type=int, nargs='?', help='batch size')
-    parser.add_argument('--n_units_2', default=16, type=int, nargs='?', help='batch size')
-    parser.add_argument('--dropout_1', default=0, type=float, nargs='?', help='batch size')
-    parser.add_argument('--dropout_2', default=0, type=float, nargs='?', help='batch size')
-    parser.add_argument('--activation_fn_1', default="tanh", nargs='?', type=str, help='batch size')
-    parser.add_argument('--activation_fn_2', default="tanh", nargs='?', type=str, help='batch size')
-    parser.add_argument('--init_lr', default=1e-3, type=float, nargs='?', help='batch size')
-    parser.add_argument('--lr_schedule', default="cosine", nargs='?', type=str, help='batch size')
-    parser.add_argument('--n_epochs', default=100, type=int, nargs='?', help='batch size')
+    parser.add_argument('--n_units_1', default=16, type=int, nargs='?', help='number of units in first layer')
+    parser.add_argument('--n_units_2', default=16, type=int, nargs='?', help='number of units in second layer')
+    parser.add_argument('--dropout_1', default=0, type=float, nargs='?', help='dropout in first layer')
+    parser.add_argument('--dropout_2', default=0, type=float, nargs='?', help='dropout in second layer')
+    parser.add_argument('--activation_fn_1', default="tanh", nargs='?', type=str, help='activation in first layer')
+    parser.add_argument('--activation_fn_2', default="tanh", nargs='?', type=str, help='activation in second layer')
+    parser.add_argument('--init_lr', default=1e-3, type=float, nargs='?', help='initial learning rate')
+    parser.add_argument('--lr_schedule', default="cosine", nargs='?', type=str, help='learning rate schedule')
+    parser.add_argument('--n_epochs', default=100, type=int, nargs='?', help='number of epochs for training')
 
-    parser.add_argument('--model_dir', nargs='?', default="./model_dir", type=str, help='batch size')
-    parser.add_argument('--data_dir', nargs='?', default="./year_prediction", type=str,
+    parser.add_argument('--model_dir', nargs='?', default="./model_dir", type=str, help='directory where'
+                                                                                        'the results will be saved')
+    parser.add_argument('--data_dir', nargs='?', default="./protein_structure", type=str,
                         help='batch size')
+    parser.add_argument('--dataset', default="protein_structure", nargs='?', type=str, help='dataset name')
 
     args = vars(parser.parse_args())
 
