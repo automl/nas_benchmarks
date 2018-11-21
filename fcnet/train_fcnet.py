@@ -131,17 +131,19 @@ if __name__ == "__main__":
     parser.add_argument('--n_units_2', default=16, type=int, nargs='?', help='number of units in second layer')
     parser.add_argument('--dropout_1', default=0, type=float, nargs='?', help='dropout in first layer')
     parser.add_argument('--dropout_2', default=0, type=float, nargs='?', help='dropout in second layer')
-    parser.add_argument('--activation_fn_1', default="tanh", nargs='?', type=str, help='activation in first layer')
-    parser.add_argument('--activation_fn_2', default="tanh", nargs='?', type=str, help='activation in second layer')
+    parser.add_argument('--activation_fn_1', default="tanh", nargs='?', type=str, help='type of activation function '
+                                                                                       'in first layer')
+    parser.add_argument('--activation_fn_2', default="tanh", nargs='?', type=str, help='type of activation function '
+                                                                                       'in second layer')
     parser.add_argument('--init_lr', default=1e-3, type=float, nargs='?', help='initial learning rate')
     parser.add_argument('--lr_schedule', default="cosine", nargs='?', type=str, help='learning rate schedule')
-    parser.add_argument('--n_epochs', default=100, type=int, nargs='?', help='number of epochs for training')
+    parser.add_argument('--n_epochs', default=100, type=int, nargs='?', help='total number of epochs for training')
 
-    parser.add_argument('--model_dir', nargs='?', default="./model_dir", type=str, help='directory where'
+    parser.add_argument('--model_dir', nargs='?', default="./model_dir", type=str, help='specifies the directory where'
                                                                                         'the results will be saved')
     parser.add_argument('--data_dir', nargs='?', default="./protein_structure", type=str,
-                        help='batch size')
-    parser.add_argument('--dataset', default="protein_structure", nargs='?', type=str, help='dataset name')
+                        help='path to the dataset')
+    parser.add_argument('--dataset', default="protein_structure", nargs='?', type=str, help='name of the dataset')
 
     args = vars(parser.parse_args())
 
