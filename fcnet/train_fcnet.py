@@ -5,11 +5,12 @@ import numpy as np
 import functools
 
 import argparse
-import keras
+
 from keras.models import Sequential
-from keras.layers import Dense, Dropout, Activation
+from keras.layers import Dense, Dropout
 from keras.optimizers import Adam
 from keras.callbacks import LearningRateScheduler
+
 import keras.backend as K
 
 
