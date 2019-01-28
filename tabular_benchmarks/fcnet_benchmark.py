@@ -1,18 +1,19 @@
-import os
 import json
+import os
+
+import ConfigSpace
 import h5py
 import numpy as np
-import ConfigSpace
 
 
 class FCNetBenchmark(object):
 
-    def __init__(self, dataset="fcnet_protein_structure_data.hdf5", seed=None):
+    def __init__(self, path, dataset="fcnet_protein_structure_data.hdf5", seed=None):
 
         cs = self.get_configuration_space()
         self.names = [h.name for h in cs.get_hyperparameters()]
 
-        self.data = h5py.File(os.path.join(dataset), "r")
+        self.data = h5py.File(os.path.join(path, dataset), "r")
 
         self.X = []
         self.y = []
@@ -74,7 +75,7 @@ class FCNetBenchmark(object):
 
         time_per_epoch = runtime / 100
 
-        rt = [time_per_epoch * (i+1) for i in range(budget)]
+        rt = [time_per_epoch * (i + 1) for i in range(budget)]
 
         self.X.append(config)
         self.y.append(lc[-1])
@@ -159,3 +160,105 @@ class FCNetBenchmark(object):
         cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("lr_schedule", ["cosine", "const"]))
         cs.add_hyperparameter(ConfigSpace.OrdinalHyperparameter("batch_size", [8, 16, 32, 64]))
         return cs
+
+
+class FCNetSliceLocalizationBenchmark(FCNetBenchmark):
+
+    def __init__(self, data_dir="./"):
+        super(FCNetSliceLocalizationBenchmark, self).__init__(path=data_dir,
+                                                              dataset="fcnet_slice_localiztation_data.hdf5")
+
+
+class FCNetProteinStructureBenchmark(FCNetBenchmark):
+
+    def __init__(self, data_dir="./"):
+        super(FCNetProteinStructureBenchmark, self).__init__(path=data_dir, dataset="fcnet_protein_structure_data.hdf5")
+
+
+class FCNetYearPredictionBenchmark(FCNetBenchmark):
+
+    def __init__(self, data_dir="./"):
+
+        super(FCNetYearPredictionBenchmark, self).__init__(path=data_dir, dataset="fcnet_year_prediction_data.hdf5")
+
+    def get_best_configuration(self):
+
+        """
+        Returns the best configuration in the dataset that achieves the lowest test performance.
+
+        :return: Returns tuple with the best configuration, its final validation performance and its test performance
+        """
+
+        configs, te, ve = [], [], []
+        for k in self.data.keys():
+            configs.append(json.loads(k))
+            te.append(np.mean(self.data[k]["final_test_error"]))
+            ve.append(np.mean(self.data[k]["valid_mae"][:, -1]))
+
+        b = np.argmin(te)
+
+        return configs[b], ve[b], te[b]
+
+    def objective_function(self, config, budget=100, **kwargs):
+
+        i = self.rng.randint(4)
+
+        if type(config) == ConfigSpace.Configuration:
+            k = json.dumps(config.get_dictionary(), sort_keys=True)
+        else:
+            k = json.dumps(config, sort_keys=True)
+
+        valid = self.data[k]["valid_mae"][i]
+        runtime = self.data[k]["runtime"][i]
+
+        time_per_epoch = runtime / 100
+
+        rt = time_per_epoch * budget
+
+        self.X.append(config)
+        self.y.append(np.mean(self.data[k]["valid_mae"][:, budget - 1]))
+        self.c.append(np.mean(self.data[k]["runtime"]) / 100 * budget)
+
+        return valid[budget - 1], rt
+
+    def objective_function_learning_curve(self, config, budget=100):
+
+        index = self.rng.randint(4)
+
+        if type(config) == ConfigSpace.Configuration:
+            k = json.dumps(config.get_dictionary(), sort_keys=True)
+        else:
+            k = json.dumps(config, sort_keys=True)
+
+        lc = [self.data[k]["valid_mae"][index][i] for i in range(budget)]
+        runtime = self.data[k]["runtime"][index]
+
+        time_per_epoch = runtime / 100
+
+        rt = [time_per_epoch * (i + 1) for i in range(budget)]
+
+        self.X.append(config)
+        self.y.append(lc[-1])
+        self.c.append(rt[-1])
+
+        return lc, rt
+
+    def objective_function_deterministic(self, config, budget=100, index=0, **kwargs):
+
+        if type(config) == ConfigSpace.Configuration:
+            k = json.dumps(config.get_dictionary(), sort_keys=True)
+        else:
+            k = json.dumps(config, sort_keys=True)
+
+        valid = self.data[k]["valid_mae"][index]
+        runtime = self.data[k]["runtime"][index]
+
+        time_per_epoch = runtime / 100
+
+        rt = time_per_epoch * budget
+
+        self.X.append(config)
+        self.y.append(valid[budget - 1])
+        self.c.append(rt)
+
+        return valid[budget - 1], rt

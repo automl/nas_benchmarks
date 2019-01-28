@@ -1,7 +1,7 @@
 
-from tabular_benchmarks.fcnet_benchmark import FCNetBenchmark
+from tabular_benchmarks import FCNetProteinStructureBenchmark
 
-b = FCNetBenchmark(dataset="./fcnet_protein_structure_data.hdf5")
+b = FCNetProteinStructureBenchmark(data_dir="./fcnet_tabular_benchmarks/")
 cs = b.get_configuration_space()
 config = cs.sample_configuration()
 
