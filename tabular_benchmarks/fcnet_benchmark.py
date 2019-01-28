@@ -166,7 +166,7 @@ class FCNetSliceLocalizationBenchmark(FCNetBenchmark):
 
     def __init__(self, data_dir="./"):
         super(FCNetSliceLocalizationBenchmark, self).__init__(path=data_dir,
-                                                              dataset="fcnet_slice_localiztation_data.hdf5")
+                                                              dataset="fcnet_slice_localization_data.hdf5")
 
 
 class FCNetProteinStructureBenchmark(FCNetBenchmark):
