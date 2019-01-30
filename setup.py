@@ -7,6 +7,7 @@ requires = [
     'h5py',
     'numpy',
     'ConfigSpace'
+    'https://github.com/google-research/nasbench/archive/master.zip'
     ]
 
 setup(name='profet',
