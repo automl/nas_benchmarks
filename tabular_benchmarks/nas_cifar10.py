@@ -99,8 +99,8 @@ class NASCifar10A(NASCifar10):
             matrix[row, col] = config["edge_%d" % i]
 
         if not graph_util.is_full_dag(matrix) or graph_util.num_edges(matrix) > MAX_EDGES:
-            self.record_invalid(config, 1, 1, 1e-10)
-            return 1, 1e-10
+            self.record_invalid(config, 1, 1, 0)
+            return 1, 0
 
         labeling = [config["op_node_%d" % i] for i in range(5)]
         labeling = ['input'] + list(labeling) + ['output']
@@ -139,8 +139,8 @@ class NASCifar10B(NASCifar10):
                                  (VERTICES, VERTICES),
                                  dtype=np.int8)
         if not graph_util.is_full_dag(matrix) or graph_util.num_edges(matrix) > MAX_EDGES:
-            self.record_invalid(config, 1, 1, 1e-10)
-            return 1, 1e-10
+            self.record_invalid(config, 1, 1, 0)
+            return 1, 0
 
         labeling = [config["op_node_%d" % i] for i in range(5)]
         labeling = ['input'] + list(labeling) + ['output']
