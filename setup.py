@@ -8,7 +8,7 @@ requires = [
     'numpy',
     'ConfigSpace'
     'pandas',  # missing dependency of nasbench
-    'https://github.com/google-research/nasbench/archive/master.zip'
+    'git+https://github.com/google-research/nasbench.git@master'
     ]
 
 setup(name='profet',
