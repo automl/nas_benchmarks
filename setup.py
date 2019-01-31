@@ -6,7 +6,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 requires = [
     'h5py',
     'numpy',
-    'ConfigSpace'
+    'ConfigSpace',
     'pandas',  # missing dependency of nasbench
 ]
 non_pypi_requires = [
