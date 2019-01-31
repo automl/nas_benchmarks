@@ -7,6 +7,8 @@ requires = [
     'h5py',
     'numpy',
     'ConfigSpace'
+    'pandas',  # missing dependency of nasbench
+    'https://github.com/google-research/nasbench/archive/master.zip'
     ]
 
 setup(name='profet',
