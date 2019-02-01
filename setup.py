@@ -6,10 +6,12 @@ here = os.path.abspath(os.path.dirname(__file__))
 requires = [
     'h5py',
     'numpy',
-    'ConfigSpace'
+    'ConfigSpace',
     'pandas',  # missing dependency of nasbench
-    'https://github.com/google-research/nasbench/archive/master.zip'
-    ]
+]
+non_pypi_requires = [
+    'git+https://github.com/google-research/nasbench.git@master#egg=nasbench' 
+]
 
 setup(name='profet',
       version='0.0.1',
@@ -18,4 +20,6 @@ setup(name='profet',
       author_email='kleinaa@cs.uni-freiburg.de',
       keywords='hyperparameter optimization',
       packages=find_packages(),
-      install_requires=requires)
+      install_requires=requires,
+      dependency_links=non_pypi_requires,
+     )
