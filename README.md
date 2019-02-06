@@ -3,7 +3,7 @@
 Tabular benchmarks that mimics the hyperparameter and architecture search
 of a 2-layer fully connected neural network on 3 different UCI regression datasets.
 
-For more detailed description see:
+For a more detailed description see:
 
 Towards Reproducible Neural Architecture and Hyperparameter Search
 
