@@ -13,7 +13,7 @@ non_pypi_requires = [
     'git+https://github.com/google-research/nasbench.git@master#egg=nasbench' 
 ]
 
-setup(name='profet',
+setup(name='nas_benchmarks',
       version='0.0.1',
       description='tabular benchmarks for feed forward neural networks',
       author='Aaron Klein',
