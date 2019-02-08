@@ -1,9 +1,9 @@
 import os
-import numpy as np
-import ConfigSpace
 
-from nasbench.lib import graph_util
+import ConfigSpace
+import numpy as np
 from nasbench import api
+from nasbench.lib import graph_util
 
 MAX_EDGES = 9
 VERTICES = 7
@@ -98,16 +98,21 @@ class NASCifar10A(NASCifar10):
             col = idx[1][i]
             matrix[row, col] = config["edge_%d" % i]
 
-        if not graph_util.is_full_dag(matrix) or graph_util.num_edges(matrix) > MAX_EDGES:
+        # if not graph_util.is_full_dag(matrix) or graph_util.num_edges(matrix) > MAX_EDGES:
+        if graph_util.num_edges(matrix) > MAX_EDGES:
             self.record_invalid(config, 1, 1, 0)
             return 1, 0
 
         labeling = [config["op_node_%d" % i] for i in range(5)]
         labeling = ['input'] + list(labeling) + ['output']
         model_spec = api.ModelSpec(matrix, labeling)
-        data = self.dataset.query(model_spec, num_epochs=budget)
-        self.record_valid(config, model_spec, budget)
+        try:
+           data = self.dataset.query(model_spec, num_epochs=budget)
+        except api.OutOfDomainError:
+            self.record_invalid(config, 1, 1, 0)
+            return 1, 0
 
+        self.record_valid(config, model_spec, budget)
         return 1 - data["validation_accuracy"], data["training_time"]
 
     @staticmethod
@@ -138,14 +143,20 @@ class NASCifar10B(NASCifar10):
         matrix = np.fromfunction(graph_util.gen_is_edge_fn(out),
                                  (VERTICES, VERTICES),
                                  dtype=np.int8)
-        if not graph_util.is_full_dag(matrix) or graph_util.num_edges(matrix) > MAX_EDGES:
+        # if not graph_util.is_full_dag(matrix) or graph_util.num_edges(matrix) > MAX_EDGES:
+        if graph_util.num_edges(matrix) > MAX_EDGES:
             self.record_invalid(config, 1, 1, 0)
             return 1, 0
 
         labeling = [config["op_node_%d" % i] for i in range(5)]
         labeling = ['input'] + list(labeling) + ['output']
         model_spec = api.ModelSpec(matrix, labeling)
-        data = self.dataset.query(model_spec, num_epochs=budget)
+        try:
+            data = self.dataset.query(model_spec, num_epochs=budget)
+        except api.OutOfDomainError:
+            self.record_invalid(config, 1, 1, 0)
+            return 1, 0
+
         self.record_valid(config, model_spec, budget)
 
         return 1 - data["validation_accuracy"], data["training_time"]
