@@ -175,3 +175,55 @@ class NASCifar10B(NASCifar10):
         for i in range(MAX_EDGES):
             cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("edge_%d" % i, cat))
         return cs
+
+
+class NASCifar10C(NASCifar10):
+    def objective_function(self, config, budget=108):
+
+        edge_prob = []
+        for i in range(VERTICES * (VERTICES - 1) // 2):
+            edge_prob.append(config["edge_%d" % i])
+
+        idx = np.argsort(edge_prob)[::-1][:config["num_edges"]]
+        binay_encoding = np.zeros(len(edge_prob))
+        binay_encoding[idx] = 1
+        matrix = np.zeros([VERTICES, VERTICES], dtype=np.int8)
+        idx = np.triu_indices(matrix.shape[0], k=1)
+        for i in range(VERTICES * (VERTICES - 1) // 2):
+            row = idx[0][i]
+            col = idx[1][i]
+            matrix[row, col] = binay_encoding[i]
+
+        if graph_util.num_edges(matrix) > MAX_EDGES:
+            self.record_invalid(config, 1, 1, 0)
+            return 1, 0
+
+        labeling = [config["op_node_%d" % i] for i in range(5)]
+        labeling = ['input'] + list(labeling) + ['output']
+        model_spec = api.ModelSpec(matrix, labeling)
+        try:
+            data = self.dataset.query(model_spec, num_epochs=budget)
+        except api.OutOfDomainError:
+            self.record_invalid(config, 1, 1, 0)
+            return 1, 0
+
+        self.record_valid(config, model_spec, budget)
+
+        return 1 - data["validation_accuracy"], data["training_time"]
+
+    @staticmethod
+    def get_configuration_space():
+        cs = ConfigSpace.ConfigurationSpace()
+
+        ops_choices = ['conv1x1-bn-relu', 'conv3x3-bn-relu', 'maxpool3x3']
+        cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("op_node_0", ops_choices))
+        cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("op_node_1", ops_choices))
+        cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("op_node_2", ops_choices))
+        cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("op_node_3", ops_choices))
+        cs.add_hyperparameter(ConfigSpace.CategoricalHyperparameter("op_node_4", ops_choices))
+
+        cs.add_hyperparameter(ConfigSpace.UniformIntegerHyperparameter("num_edges", 0, MAX_EDGES))
+
+        for i in range(VERTICES * (VERTICES - 1) // 2):
+            cs.add_hyperparameter(ConfigSpace.UniformFloatHyperparameter("edge_%d" % i, 0, 1))
+        return cs
