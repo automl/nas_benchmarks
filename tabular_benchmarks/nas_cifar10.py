@@ -152,7 +152,7 @@ class NASCifar10B(NASCifar10):
         labeling = ['input'] + list(labeling) + ['output']
         model_spec = api.ModelSpec(matrix, labeling)
         try:
-            data = self.dataset.query(model_spec, num_epochs=budget)
+            data = self.dataset.query(model_spec, epochs=budget)
         except api.OutOfDomainError:
             self.record_invalid(config, 1, 1, 0)
             return 1, 0
@@ -202,7 +202,7 @@ class NASCifar10C(NASCifar10):
         labeling = ['input'] + list(labeling) + ['output']
         model_spec = api.ModelSpec(matrix, labeling)
         try:
-            data = self.dataset.query(model_spec, num_epochs=budget)
+            data = self.dataset.query(model_spec, epochs=budget)
         except api.OutOfDomainError:
             self.record_invalid(config, 1, 1, 0)
             return 1, 0
