@@ -34,17 +34,17 @@ class NASCifar10(object):
 
     def record_valid(self, config, model_spec, budget):
         self.X.append(config)
-        data = self.dataset.get_model_metrics(model_spec)
+        _, data = self.dataset.get_metrics_from_spec(model_spec)
 
         # compute mean test error for the final budget
-        mean_test_error = 1 - np.mean([data[108][i]["test_accuracy"][1] for i in range(3)])
+        mean_test_error = 1 - np.mean([data[108][i]["final_test_accuracy"] for i in range(3)])
         self.y_test.append(mean_test_error)
 
         # compute mean validation error for the chosen budget
-        mean_valid_error = 1 - np.mean([data[budget][i]["validation_accuracy"][1] for i in range(3)])
+        mean_valid_error = 1 - np.mean([data[budget][i]["final_validation_accuracy"] for i in range(3)])
         self.y_valid.append(mean_valid_error)
 
-        mean_runtime = np.mean([data[budget][i]["training_time"][1] for i in range(3)])
+        mean_runtime = np.mean([data[budget][i]["final_training_time"]for i in range(3)])
         self.costs.append(mean_runtime)
 
     @staticmethod
@@ -107,7 +107,7 @@ class NASCifar10A(NASCifar10):
         labeling = ['input'] + list(labeling) + ['output']
         model_spec = api.ModelSpec(matrix, labeling)
         try:
-           data = self.dataset.query(model_spec, num_epochs=budget)
+           data = self.dataset.query(model_spec, epochs=budget)
         except api.OutOfDomainError:
             self.record_invalid(config, 1, 1, 0)
             return 1, 0
@@ -152,7 +152,7 @@ class NASCifar10B(NASCifar10):
         labeling = ['input'] + list(labeling) + ['output']
         model_spec = api.ModelSpec(matrix, labeling)
         try:
-            data = self.dataset.query(model_spec, num_epochs=budget)
+            data = self.dataset.query(model_spec, epochs=budget)
         except api.OutOfDomainError:
             self.record_invalid(config, 1, 1, 0)
             return 1, 0
@@ -202,7 +202,7 @@ class NASCifar10C(NASCifar10):
         labeling = ['input'] + list(labeling) + ['output']
         model_spec = api.ModelSpec(matrix, labeling)
         try:
-            data = self.dataset.query(model_spec, num_epochs=budget)
+            data = self.dataset.query(model_spec, epochs=budget)
         except api.OutOfDomainError:
             self.record_invalid(config, 1, 1, 0)
             return 1, 0
