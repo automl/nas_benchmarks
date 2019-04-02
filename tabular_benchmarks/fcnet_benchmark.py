@@ -180,3 +180,10 @@ class FCNetYearPredictionBenchmark(FCNetBenchmark):
     def __init__(self, data_dir="./"):
 
         super(FCNetYearPredictionBenchmark, self).__init__(path=data_dir, dataset="fcnet_year_prediction_data.hdf5")
+
+
+class FCNetNavalPropulsionBenchmark(FCNetBenchmark):
+
+    def __init__(self, data_dir="./"):
+
+        super(FCNetNavalPropulsionBenchmark, self).__init__(path=data_dir, dataset="fcnet_naval_propulsion_data.hdf5")
