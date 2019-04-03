@@ -187,3 +187,11 @@ class FCNetNavalPropulsionBenchmark(FCNetBenchmark):
     def __init__(self, data_dir="./"):
 
         super(FCNetNavalPropulsionBenchmark, self).__init__(path=data_dir, dataset="fcnet_naval_propulsion_data.hdf5")
+
+
+class FCNetParkinsonsTelemonitoringBenchmark(FCNetBenchmark):
+
+    def __init__(self, data_dir="./"):
+
+        super(FCNetParkinsonsTelemonitoringBenchmark, self).__init__(path=data_dir,
+                                                                     dataset="fcnet_parkinsons_telemonitoring_data.hdf5")
