@@ -6,7 +6,7 @@ from tabular_benchmarks import NASCifar10A, NASCifar10B, NASCifar10C
 class TestNASCifar10A(unittest.TestCase):
 
     def setUp(self):
-        self.b = NASCifar10A(data_dir="/home/kleinaa/datasets/")
+        self.b = NASCifar10A(data_dir="./")
 
     def test_fix_configuration(self):
         cs = self.b.get_configuration_space()
@@ -47,7 +47,7 @@ class TestNASCifar10A(unittest.TestCase):
 class TestNASCifar10B(unittest.TestCase):
 
     def setUp(self):
-        self.b = NASCifar10B(data_dir="/home/kleinaa/datasets/")
+        self.b = NASCifar10B(data_dir="./")
 
     def test_fix_configuration(self):
         cs = self.b.get_configuration_space()
@@ -85,7 +85,7 @@ class TestNASCifar10B(unittest.TestCase):
 class TestNASCifar10C(unittest.TestCase):
 
     def setUp(self):
-        self.b = NASCifar10C(data_dir="/home/kleinaa/datasets/")
+        self.b = NASCifar10C(data_dir="./")
 
     def test_fix_configuration(self):
         cs = self.b.get_configuration_space()
