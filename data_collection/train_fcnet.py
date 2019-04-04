@@ -15,29 +15,28 @@ import keras.backend as K
 
 
 def get_data(path, dataset="protein_structure"):
-    train = np.array(np.load(os.path.join(path, "%s_train_data.npy" % dataset)), dtype=np.float32)
-    train_targets = np.array(np.load(os.path.join(path, "%s_train_targets.npy" % dataset)), dtype=np.float32)
+    train = np.array(np.load(os.path.join(path, "%s_train_data.npy" % dataset)), dtype=np.float64)
+    train_targets = np.array(np.load(os.path.join(path, "%s_train_targets.npy" % dataset)), dtype=np.float64)
 
-    valid = np.array(np.load(os.path.join(path, "%s_valid_data.npy" % dataset)), dtype=np.float32)
-    valid_targets = np.array(np.load(os.path.join(path, "%s_valid_targets.npy" % dataset)), dtype=np.float32)
+    valid = np.array(np.load(os.path.join(path, "%s_valid_data.npy" % dataset)), dtype=np.float64)
+    valid_targets = np.array(np.load(os.path.join(path, "%s_valid_targets.npy" % dataset)), dtype=np.float64)
 
-    test = np.array(np.load(os.path.join(path, "%s_test_data.npy" % dataset)), dtype=np.float32)
-    test_targets = np.array(np.load(os.path.join(path, "%s_test_targets.npy" % dataset)), dtype=np.float32)
+    test = np.array(np.load(os.path.join(path, "%s_test_data.npy" % dataset)), dtype=np.float64)
+    test_targets = np.array(np.load(os.path.join(path, "%s_test_targets.npy" % dataset)), dtype=np.float64)
 
     m = np.mean(train, axis=0)
-    s = np.mean(train, axis=0)
+    s = np.std(train, axis=0)
 
     train = (train - m) / s
     valid = (valid - m) / s
     test = (test - m) / s
 
     m = np.mean(train_targets, axis=0)
-    s = np.mean(train_targets, axis=0)
+    s = np.std(train_targets, axis=0)
 
     train_targets = (train_targets - m) / s
     valid_targets = (valid_targets - m) / s
     test_targets = (test_targets - m) / s
-
     return train, train_targets, valid, valid_targets, test, test_targets
 
 
