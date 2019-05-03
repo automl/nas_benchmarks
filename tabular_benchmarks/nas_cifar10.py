@@ -32,7 +32,10 @@ class NASCifar10(object):
         self.y_test.append(test)
         self.costs.append(costs)
 
-    def record_valid(self, data, model_spec):
+    def record_valid(self, config, data, model_spec):
+
+        self.X.append(config)
+
         # compute mean test error for the final budget
         _, metrics = self.dataset.get_metrics_from_spec(model_spec)
         mean_test_error = 1 - np.mean([metrics[108][i]["final_test_accuracy"] for i in range(3)])
@@ -104,7 +107,7 @@ class NASCifar10A(NASCifar10):
             self.record_invalid(config, 1, 1, 0)
             return 1, 0
 
-        self.record_valid(data, model_spec)
+        self.record_valid(config, data, model_spec)
         return 1 - data["validation_accuracy"], data["training_time"]
 
     @staticmethod
@@ -149,7 +152,7 @@ class NASCifar10B(NASCifar10):
             self.record_invalid(config, 1, 1, 0)
             return 1, 0
 
-        self.record_valid(data, model_spec)
+        self.record_valid(config, data, model_spec)
 
         return 1 - data["validation_accuracy"], data["training_time"]
 
@@ -199,7 +202,7 @@ class NASCifar10C(NASCifar10):
             self.record_invalid(config, 1, 1, 0)
             return 1, 0
 
-        self.record_valid(data, model_spec)
+        self.record_valid(config, data, model_spec)
 
         return 1 - data["validation_accuracy"], data["training_time"]
 
