@@ -32,20 +32,21 @@ class NASCifar10(object):
         self.y_test.append(test)
         self.costs.append(costs)
 
-    def record_valid(self, config, model_spec, budget):
+    def record_valid(self, config, data, model_spec):
+
         self.X.append(config)
-        _, data = self.dataset.get_metrics_from_spec(model_spec)
 
         # compute mean test error for the final budget
-        mean_test_error = 1 - np.mean([data[108][i]["final_test_accuracy"] for i in range(3)])
+        _, metrics = self.dataset.get_metrics_from_spec(model_spec)
+        mean_test_error = 1 - np.mean([metrics[108][i]["final_test_accuracy"] for i in range(3)])
         self.y_test.append(mean_test_error)
 
-        # compute mean validation error for the chosen budget
-        mean_valid_error = 1 - np.mean([data[budget][i]["final_validation_accuracy"] for i in range(3)])
-        self.y_valid.append(mean_valid_error)
+        # compute validation error for the chosen budget
+        valid_error = 1 - data["validation_accuracy"]
+        self.y_valid.append(valid_error)
 
-        mean_runtime = np.mean([data[budget][i]["final_training_time"]for i in range(3)])
-        self.costs.append(mean_runtime)
+        runtime = data["training_time"]
+        self.costs.append(runtime)
 
     @staticmethod
     def get_configuration_space():
@@ -85,12 +86,6 @@ class NASCifar10(object):
 
 class NASCifar10A(NASCifar10):
     def objective_function(self, config, budget=108):
-        # bit = 0
-        # for i in range(VERTICES * (VERTICES - 1) // 2):
-        #     bit += config["edge_%d" % i] * 2 ** i
-        # matrix = np.fromfunction(graph_util.gen_is_edge_fn(bit),
-        #                          (VERTICES, VERTICES),
-        #                          dtype=np.int8)
         matrix = np.zeros([VERTICES, VERTICES], dtype=np.int8)
         idx = np.triu_indices(matrix.shape[0], k=1)
         for i in range(VERTICES * (VERTICES - 1) // 2):
@@ -112,7 +107,7 @@ class NASCifar10A(NASCifar10):
             self.record_invalid(config, 1, 1, 0)
             return 1, 0
 
-        self.record_valid(config, model_spec, budget)
+        self.record_valid(config, data, model_spec)
         return 1 - data["validation_accuracy"], data["training_time"]
 
     @staticmethod
@@ -157,7 +152,7 @@ class NASCifar10B(NASCifar10):
             self.record_invalid(config, 1, 1, 0)
             return 1, 0
 
-        self.record_valid(config, model_spec, budget)
+        self.record_valid(config, data, model_spec)
 
         return 1 - data["validation_accuracy"], data["training_time"]
 
@@ -207,7 +202,7 @@ class NASCifar10C(NASCifar10):
             self.record_invalid(config, 1, 1, 0)
             return 1, 0
 
-        self.record_valid(config, model_spec, budget)
+        self.record_valid(config, data, model_spec)
 
         return 1 - data["validation_accuracy"], data["training_time"]
 
