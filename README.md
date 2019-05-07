@@ -5,4 +5,10 @@ To download the datasets for the FC-Net benchmark:
     wget http://ml4aad.org/wp-content/uploads/2019/01/fcnet_tabular_benchmarks.tar.gz
     tar xf fcnet_tabular_benchmarks.tar.gz
     
-To get the data for NASBench look [here](https://github.com/google-research/nasbench).
+The data for NASBench is [here](https://github.com/google-research/nasbench).
+
+To install it:
+
+    git clone https://github.com/automl/nas_benchmarks.git
+    cd nas_benchmarks
+    python setup.py install
