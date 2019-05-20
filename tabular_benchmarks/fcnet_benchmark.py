@@ -41,6 +41,8 @@ class FCNetBenchmark(object):
 
     def objective_function(self, config, budget=100, **kwargs):
 
+        assert 0 < budget <= 100  # check whether budget is in the correct bounds
+
         i = self.rng.randint(4)
 
         if type(config) == ConfigSpace.Configuration:
@@ -51,7 +53,7 @@ class FCNetBenchmark(object):
         valid = self.data[k]["valid_mse"][i]
         runtime = self.data[k]["runtime"][i]
 
-        time_per_epoch = runtime / 100
+        time_per_epoch = runtime / 100  # divide by the maximum number of epochs
 
         rt = time_per_epoch * budget
 
@@ -63,6 +65,8 @@ class FCNetBenchmark(object):
 
     def objective_function_learning_curve(self, config, budget=100):
 
+        assert 0 < budget <= 100  # check whether budget is in the correct bounds
+
         index = self.rng.randint(4)
 
         if type(config) == ConfigSpace.Configuration:
@@ -73,7 +77,7 @@ class FCNetBenchmark(object):
         lc = [self.data[k]["valid_mse"][index][i] for i in range(budget)]
         runtime = self.data[k]["runtime"][index]
 
-        time_per_epoch = runtime / 100
+        time_per_epoch = runtime / 100 # divide by the maximum number of epochs
 
         rt = [time_per_epoch * (i + 1) for i in range(budget)]
 
@@ -85,6 +89,8 @@ class FCNetBenchmark(object):
 
     def objective_function_deterministic(self, config, budget=100, index=0, **kwargs):
 
+        assert 0 < budget <= 100  # check whether budget is in the correct bounds
+
         if type(config) == ConfigSpace.Configuration:
             k = json.dumps(config.get_dictionary(), sort_keys=True)
         else:
@@ -93,7 +99,7 @@ class FCNetBenchmark(object):
         valid = self.data[k]["valid_mse"][index]
         runtime = self.data[k]["runtime"][index]
 
-        time_per_epoch = runtime / 100
+        time_per_epoch = runtime / 100 # divide by the maximum number of epochs
 
         rt = time_per_epoch * budget
 
