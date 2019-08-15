@@ -71,7 +71,8 @@ class Model(object):
 
 def train_and_eval(config):
     y, cost = b.objective_function(config)
-    return 1 - y
+    # returns negative error (similar to maximizing accuracy)
+    return -y
 
 
 def random_architecture():
