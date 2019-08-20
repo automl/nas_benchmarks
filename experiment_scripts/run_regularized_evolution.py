@@ -7,6 +7,10 @@ In Proceedings of the Conference on Artificial Intelligence (AAAI’19)
 The code is based one the original regularized evolution open-source implementation:
 https://colab.research.google.com/github/google-research/google-research/blob/master/evolution/regularized_evolution_algorithm/regularized_evolution.ipynb
 
+NOTE: This script has certain deviations from the original code owing to the search space of the benchmarks used:
+1) The fitness function is not accuracy but error and hence the negative error is being maximized.
+2) The architecture is a ConfigSpace object that defines the model architecture parameters.
+
 """
 
 import argparse
@@ -44,7 +48,7 @@ class Model(object):
     In the context of evolutionary algorithms, a model is often referred to as
     an "individual".
 
-    Attributes:
+    Attributes:  (as in the original code)
       arch: the architecture as an int representing a bit-string of length `DIM`.
           As a result, the integers are required to be less than `2**DIM`. They
           can be visualized as strings of 0s and 1s by calling `print(model)`,
@@ -71,7 +75,8 @@ class Model(object):
 
 def train_and_eval(config):
     y, cost = b.objective_function(config)
-    return 1 - y
+    # returns negative error (similar to maximizing accuracy)
+    return -y
 
 
 def random_architecture():
