@@ -13,7 +13,8 @@ class NASCifar10(object):
 
     def __init__(self, data_dir, multi_fidelity=True):
 
-        if multi_fidelity:
+        self.multi_fidelity = multi_fidelity
+        if self.multi_fidelity:
             self.dataset = api.NASBench(os.path.join(data_dir, 'nasbench_full.tfrecord'))
         else:
             self.dataset = api.NASBench(os.path.join(data_dir, 'nasbench_only108.tfrecord'))
@@ -96,6 +97,9 @@ class NASCifar10(object):
 
 class NASCifar10A(NASCifar10):
     def objective_function(self, config, budget=108):
+        if self.multi_fidelity is False:
+            assert budget == 108
+        
         matrix = np.zeros([VERTICES, VERTICES], dtype=np.int8)
         idx = np.triu_indices(matrix.shape[0], k=1)
         for i in range(VERTICES * (VERTICES - 1) // 2):
@@ -137,6 +141,8 @@ class NASCifar10A(NASCifar10):
 
 class NASCifar10B(NASCifar10):
     def objective_function(self, config, budget=108):
+        if self.multi_fidelity is False:
+            assert budget == 108
 
         bitlist = [0] * (VERTICES * (VERTICES - 1) // 2)
         for i in range(MAX_EDGES):
@@ -184,6 +190,8 @@ class NASCifar10B(NASCifar10):
 
 class NASCifar10C(NASCifar10):
     def objective_function(self, config, budget=108):
+        if self.multi_fidelity is False:
+            assert budget == 108
 
         edge_prob = []
         for i in range(VERTICES * (VERTICES - 1) // 2):
