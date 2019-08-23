@@ -11,9 +11,12 @@ VERTICES = 7
 
 class NASCifar10(object):
 
-    def __init__(self, data_dir):
+    def __init__(self, data_dir, multi_fidelity=True):
 
-        self.dataset = api.NASBench(os.path.join(data_dir, 'nasbench_full.tfrecord'))
+        if multi_fidelity:
+            self.dataset = api.NASBench(os.path.join(data_dir, 'nasbench_full.tfrecord'))
+        else:
+            self.dataset = api.NASBench(os.path.join(data_dir, 'nasbench_only108.tfrecord'))
         self.X = []
         self.y_valid = []
         self.y_test = []
@@ -21,6 +24,13 @@ class NASCifar10(object):
 
         self.y_star_valid = 0.04944576819737756  # lowest mean validation error
         self.y_star_test = 0.056824247042338016  # lowest mean test error
+
+    def reset_tracker(self):
+        # __init__() sans the data loading for multiple runs
+        self.X = []
+        self.y_valid = []
+        self.y_test = []
+        self.costs = []
 
     @staticmethod
     def objective_function(self, config):

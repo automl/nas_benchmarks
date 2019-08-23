@@ -21,6 +21,13 @@ class FCNetBenchmark(object):
 
         self.rng = np.random.RandomState(seed)
 
+    def reset_tracker(self):
+        # __init__() sans the data loading for multiple runs
+        self.X = []
+        self.y = []
+        self.c = []
+        self.rng = np.random.RandomState(seed)
+
     def get_best_configuration(self):
 
         """
